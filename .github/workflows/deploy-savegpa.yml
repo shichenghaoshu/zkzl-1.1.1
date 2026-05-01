@@ -126,6 +126,7 @@ jobs:
           mkdir -p "$RELEASE" "$SHARED"
           tar -C "$RELEASE" -xzf "$APP_ARCHIVE"
           rm -f "$APP_ARCHIVE"
+          cp -a "$RELEASE/dist/." "$RELEASE/"
 
           install -m 600 "$ENV_UPLOAD" "$SHARED/.env.production.local"
           rm -f "$ENV_UPLOAD"
