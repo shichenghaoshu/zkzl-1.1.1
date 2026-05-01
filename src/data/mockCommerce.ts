@@ -23,10 +23,6 @@ export type UsageAccount = {
   monthlyQuota: number;
   monthlyUsed: number;
   points: number;
-  apiProvider: string;
-  apiEndpoint: string;
-  apiModel: string;
-  apiCredential: string;
   expiresAt?: string;
   lastRedeemedCode?: string;
 };
@@ -107,12 +103,6 @@ export const mockRedeemCodes: RedeemCode[] = [
   }
 ];
 
-export const defaultApiConfig = {
-  provider: "OpenAI 兼容网关",
-  endpoint: "https://api.keyou-ai.local/v1/lesson-generate",
-  model: "keyou-lesson-pro"
-};
-
 export const createUserFromInvite = (
   inviteCode: string,
   name: string,
@@ -139,10 +129,6 @@ export const createUserFromInvite = (
     monthlyQuota: invite.monthlyQuota,
     monthlyUsed: invite.plan === "monthly" ? 12 : 0,
     points: invite.points,
-    apiProvider: defaultApiConfig.provider,
-    apiEndpoint: defaultApiConfig.endpoint,
-    apiModel: defaultApiConfig.model,
-    apiCredential: "",
     expiresAt: invite.plan === "monthly" ? addDays(31) : undefined
   };
 
@@ -158,15 +144,6 @@ export const generateInviteCode = (organizationName: string, plan: BillingPlan) 
     .toUpperCase();
   const random = Math.random().toString(36).slice(2, 7).toUpperCase();
   return `${prefix}-${orgMark || "ORG"}-${random}`;
-};
-
-export const generateApiCredential = (user: AuthUser) => {
-  const org = user.organizationName
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .slice(0, 8)
-    .toLowerCase();
-  const random = Math.random().toString(36).slice(2, 14);
-  return `kyai_${org || "school"}_${random}`;
 };
 
 export const maskCredential = (credential: string) => {

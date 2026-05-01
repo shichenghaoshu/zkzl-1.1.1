@@ -86,9 +86,9 @@ export const mainNavItems: Array<{
   },
   {
     route: "backend",
-    label: "后台配置",
+    label: "权益核销",
     icon: "⚙️",
-    description: "API 与核销"
+    description: "额度与码库"
   },
   {
     route: "ops",

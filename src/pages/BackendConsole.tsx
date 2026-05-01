@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ProgressBar } from "../components/ProgressBar";
@@ -6,7 +6,6 @@ import {
   generateInviteCode,
   getPlanLabel,
   getRemainingMonthlyQuota,
-  maskCredential,
   type AuthUser,
   type BillingPlan,
   type InviteCode,
@@ -22,8 +21,6 @@ type BackendConsoleProps = {
   redeemedCodes: string[];
   redeemCodes: RedeemCode[];
   onRedeemCode: (code: string) => RedeemResult;
-  onGenerateCredential: () => UsageAccount;
-  onUpdateUsage: (usage: UsageAccount) => void;
   onCreateInvite: (invite: InviteCode) => void;
   onNavigate: (route: AppRoute) => void;
 };
@@ -34,14 +31,9 @@ export function BackendConsole({
   redeemedCodes,
   redeemCodes,
   onRedeemCode,
-  onGenerateCredential,
-  onUpdateUsage,
   onCreateInvite,
   onNavigate
 }: BackendConsoleProps) {
-  const [apiProvider, setApiProvider] = useState(usage.apiProvider);
-  const [apiEndpoint, setApiEndpoint] = useState(usage.apiEndpoint);
-  const [apiModel, setApiModel] = useState(usage.apiModel);
   const [redeemCode, setRedeemCode] = useState("MONTH-735921");
   const [redeemMessage, setRedeemMessage] = useState("输入核销码后，系统会按月付或点券规则更新账户权益。");
   const [inviteOrg, setInviteOrg] = useState("星河小学");
@@ -50,34 +42,6 @@ export function BackendConsole({
 
   const monthlyRemaining = getRemainingMonthlyQuota(usage);
   const usagePercent = usage.monthlyQuota > 0 ? (usage.monthlyUsed / usage.monthlyQuota) * 100 : 0;
-
-  const apiPreview = useMemo(
-    () => [
-      ["POST", "/api/auth/invite-login", "邀请码注册登录，返回老师账户与用量权益"],
-      ["POST", "/api/tenant/api-keys", "后台为机构生成 API 凭证和模型配置"],
-      ["POST", "/api/billing/redeem", "核销月付码或点券码，写入账户权益"],
-      ["POST", "/api/usage/consume", "生成课件时扣减月额度或点券"]
-    ],
-    []
-  );
-
-  const saveApiConfig = () => {
-    onUpdateUsage({
-      ...usage,
-      apiProvider,
-      apiEndpoint,
-      apiModel
-    });
-    setRedeemMessage("API 配置已保存到当前 Demo 登录态。");
-  };
-
-  const generateCredential = () => {
-    const nextUsage = onGenerateCredential();
-    setApiProvider(nextUsage.apiProvider);
-    setApiEndpoint(nextUsage.apiEndpoint);
-    setApiModel(nextUsage.apiModel);
-    setRedeemMessage("已为当前机构生成模拟 API 凭证，可用于后端调用 AI 生成服务。");
-  };
 
   const redeem = () => {
     const result = onRedeemCode(redeemCode);
@@ -104,9 +68,9 @@ export function BackendConsole({
     <div className="space-y-6">
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-skybrand sm:text-6xl">后端/API 配置中心</h1>
+          <h1 className="text-4xl font-black text-skybrand sm:text-6xl">权益与核销中心</h1>
           <p className="mt-3 text-xl font-bold text-ink">
-            管理 API 配置、邀请码、登录验证与月付/点券核销
+            管理邀请码、登录验证与月付/点券核销
           </p>
         </div>
         <Card className="p-4">
@@ -119,60 +83,6 @@ export function BackendConsole({
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-black text-ink">API 供应商配置</h2>
-              <p className="mt-1 font-bold text-slate-500">
-                Demo 不连接真实 AI API，但保留后端配置入口和用户凭证生成流程。
-              </p>
-            </div>
-            <span className="rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-600">
-              模拟可用
-            </span>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
-            <label className="block">
-              <span className="mb-2 block text-sm font-black text-slate-600">API 网关</span>
-              <input
-                className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
-                value={apiProvider}
-                onChange={(event) => setApiProvider(event.target.value)}
-              />
-            </label>
-            <label className="block md:col-span-2">
-              <span className="mb-2 block text-sm font-black text-slate-600">后端生成接口</span>
-              <input
-                className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
-                value={apiEndpoint}
-                onChange={(event) => setApiEndpoint(event.target.value)}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-black text-slate-600">默认模型</span>
-              <input
-                className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
-                value={apiModel}
-                onChange={(event) => setApiModel(event.target.value)}
-              />
-            </label>
-            <div className="rounded-3xl bg-blue-50 p-4 md:col-span-2">
-              <p className="text-sm font-black text-slate-500">用户 API 凭证</p>
-              <p className="mt-2 break-all text-2xl font-black text-skybrand">
-                {maskCredential(usage.apiCredential)}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={saveApiConfig}>💾 保存 API 配置</Button>
-            <Button variant="mint" onClick={generateCredential}>
-              🧩 生成用户 API 凭证
-            </Button>
-          </div>
-        </Card>
-
         <Card tone="sun">
           <h2 className="text-2xl font-black text-ink">当前账户权益</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
@@ -186,6 +96,17 @@ export function BackendConsole({
           <p className="mt-4 rounded-2xl bg-white/76 p-3 text-sm font-bold text-slate-600">
             月付用户：生成课件扣减月度额度。次付用户：每次生成扣减 80 点券。
           </p>
+        </Card>
+
+        <Card tone="blue">
+          <h2 className="text-2xl font-black text-ink">AI 服务由管理员统一配置</h2>
+          <p className="mt-4 rounded-3xl bg-white/80 p-4 font-bold leading-7 text-slate-600">
+            老师端只负责生成课件、核销额度和管理邀请码，不展示 API Key、模型或接口设置。
+            如需配置真实 AI 通道，请使用管理员账号进入 Ops 后台。
+          </p>
+          <Button className="mt-5" variant="white" onClick={() => onNavigate("ops")}>
+            🗄️ 打开管理员后台
+          </Button>
         </Card>
       </div>
 
@@ -276,20 +197,6 @@ export function BackendConsole({
         </Card>
       </div>
 
-      <Card>
-        <h2 className="text-2xl font-black text-ink">后端 API 模拟接口</h2>
-        <div className="mt-5 grid gap-4 lg:grid-cols-4">
-          {apiPreview.map(([method, path, desc]) => (
-            <div key={path} className="rounded-3xl bg-gradient-to-b from-blue-50 to-white p-4 shadow-sm">
-              <span className="rounded-xl bg-skybrand px-3 py-1 text-xs font-black text-white">
-                {method}
-              </span>
-              <p className="mt-3 break-all font-black text-ink">{path}</p>
-              <p className="mt-2 text-sm font-bold leading-6 text-slate-500">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 }

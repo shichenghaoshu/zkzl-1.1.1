@@ -47,7 +47,7 @@ export function TeacherDashboard({ user, usage, onNavigate }: TeacherDashboardPr
                 📨 快速分享
               </Button>
               <Button variant="mint" size="lg" onClick={() => onNavigate("backend")}>
-                ⚙️ 后台配置
+                🎫 权益核销
               </Button>
             </div>
           </div>
@@ -104,7 +104,7 @@ export function TeacherDashboard({ user, usage, onNavigate }: TeacherDashboardPr
               👥 创建班级
             </Button>
             <Button fullWidth variant="white" onClick={() => onNavigate("backend")}>
-              🔐 登录 / 核销 / API
+              🔐 登录 / 核销
             </Button>
           </div>
         </Card>
