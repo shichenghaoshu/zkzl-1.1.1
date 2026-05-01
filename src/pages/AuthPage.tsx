@@ -3,7 +3,6 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Mascot } from "../components/Mascot";
 import {
-  createAdminUserFromPassword,
   createUserFromInvite,
   getPlanLabel,
   planDefinitions,
@@ -36,8 +35,6 @@ export function AuthPage({
   const [name, setName] = useState("王老师");
   const [organizationName, setOrganizationName] = useState("三年级数学教研组");
   const [inviteCode, setInviteCode] = useState("KEYOU-DEMO-2026");
-  const [adminName, setAdminName] = useState("admin");
-  const [adminPassword, setAdminPassword] = useState("keyou2026");
   const [message, setMessage] = useState("输入有效邀请码即可注册并登录 Demo 账户。");
 
   const submit = async () => {
@@ -49,29 +46,11 @@ export function AuthPage({
 
     const session = await createAiSession({ mode: "invite", inviteCode, name, organizationName });
     if (!session.ok) {
-      setMessage(session.message);
-      return;
+      console.warn(session.message);
     }
 
-    setMessage("登录成功，正在进入工作台。");
+    setMessage(session.ok ? "登录成功，正在进入工作台。" : `登录成功，但 AI 代理未连接：${session.message}`);
     onLogin(result.user, result.usage, redirectRoute);
-  };
-
-  const submitAdmin = async () => {
-    const result = createAdminUserFromPassword(adminName, adminPassword);
-    if (!result) {
-      setMessage("管理员账号或密码错误。");
-      return;
-    }
-
-    const session = await createAiSession({ mode: "admin", username: adminName, password: adminPassword });
-    if (!session.ok) {
-      setMessage(session.message);
-      return;
-    }
-
-    setMessage("管理员登录成功，正在进入 Ops 后台。");
-    onLogin(result.user, result.usage, "ops");
   };
 
   return (
@@ -135,32 +114,6 @@ export function AuthPage({
         </Card>
 
         <div className="space-y-5">
-          <Card tone="blue">
-            <h3 className="text-2xl font-black text-ink">管理员账号</h3>
-            <div className="mt-4 grid gap-3">
-              <label>
-                <span className="mb-2 block text-sm font-black text-slate-600">账号</span>
-                <input
-                  className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
-                  value={adminName}
-                  onChange={(event) => setAdminName(event.target.value)}
-                />
-              </label>
-              <label>
-                <span className="mb-2 block text-sm font-black text-slate-600">密码</span>
-                <input
-                  className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
-                  type="password"
-                  value={adminPassword}
-                  onChange={(event) => setAdminPassword(event.target.value)}
-                />
-              </label>
-              <Button fullWidth variant="secondary" onClick={submitAdmin}>
-                🗄️ 管理员登录
-              </Button>
-            </div>
-          </Card>
-
           <Card tone="sun">
             <h3 className="text-2xl font-black text-ink">套餐计划</h3>
             <div className="mt-4 space-y-3">
@@ -179,6 +132,16 @@ export function AuthPage({
                 </div>
               ))}
             </div>
+          </Card>
+
+          <Card tone="blue">
+            <h3 className="text-2xl font-black text-ink">管理员入口</h3>
+            <p className="mt-3 font-bold leading-7 text-slate-600">
+              管理员账号不在老师登录页处理，请进入独立 Ops 页面。
+            </p>
+            <Button className="mt-4" fullWidth variant="white" onClick={() => onNavigate("ops")}>
+              打开 /ops
+            </Button>
           </Card>
 
           <Card tone="mint">

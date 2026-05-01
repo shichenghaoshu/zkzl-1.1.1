@@ -11,8 +11,6 @@ type SidebarProps = {
 };
 
 export function Sidebar({ activeRoute, onNavigate, user, usage, onLogout }: SidebarProps) {
-  const visibleNavItems = mainNavItems.filter((item) => item.route !== "ops" || user?.role === "admin");
-
   return (
     <aside className="glass-panel sticky top-4 hidden h-[calc(100vh-2rem)] w-64 shrink-0 overflow-y-auto rounded-3xl p-4 shadow-xl shadow-blue-200/30 lg:block">
       <button
@@ -31,7 +29,7 @@ export function Sidebar({ activeRoute, onNavigate, user, usage, onLogout }: Side
       </button>
 
       <nav className="space-y-2">
-        {visibleNavItems.map((item) => (
+        {mainNavItems.map((item) => (
           <button
             key={item.route}
             onClick={() => onNavigate(item.route)}

@@ -86,14 +86,14 @@ export const mainNavItems: Array<{
   },
   {
     route: "backend",
-    label: "权益核销",
+    label: "邀请码/核销",
     icon: "⚙️",
-    description: "额度与码库"
+    description: "公开生成邀请码"
   },
   {
     route: "ops",
-    label: "Ops后台",
+    label: "管理员",
     icon: "🗄️",
-    description: "数据库与码库"
+    description: "独立登录 Ops"
   }
 ];

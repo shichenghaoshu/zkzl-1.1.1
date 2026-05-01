@@ -83,11 +83,39 @@ npm run typecheck
 npm run build
 ```
 
+### 服务器部署启动
+
+```bash
+npm run build
+PORT=4173 HOST=0.0.0.0 npm run start
+```
+
+生产服务由 `server/productionServer.mjs` 提供，会同时处理：
+
+- `/api/ai/*`：DeepSeek 会话、配置、测试连接、生成课件。
+- 其他路径：返回 `dist` 静态文件，并对前端路由做 SPA fallback。
+
+如果要使用真实 AI，服务器不能只部署 `dist` 静态目录；必须运行上面的 Node 服务，或把 `/api/ai/*` 反向代理到这个 Node 服务。否则 `/api/ai/session` 会被静态站点 fallback 成 `index.html`，登录页会拿到 HTML 而不是 JSON。
+
+Nginx 反向代理示例：
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:4173;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
 ### 本地预览构建产物
 
 ```bash
 npm run preview
 ```
+
+`npm run preview` 适合本机检查构建产物；服务器长期运行建议用 `npm run start`。
 
 ## 推荐演示路径
 
@@ -108,8 +136,8 @@ npm run preview
 13. 进入学生端游戏地图，体验关卡和答题反馈
 14. 点击「完成课堂，查看报告」
 15. 查看班级数据报告
-16. 进入 `/backend` 查看权益与核销中心
-17. 进入 `/ops` 查看模拟数据库、AI API、邀请码和核销码管理
+16. 进入 `/backend` 免登录生成邀请码，登录后可核销权益
+17. 进入 `/ops` 使用管理员账号登录，查看模拟数据库、AI API、邀请码和核销码管理
 
 ## 页面路由
 
@@ -124,8 +152,8 @@ npm run preview
 | `/student` | 学生端加入页 | 否 | 学生输入昵称和 PIN 码进入课堂 |
 | `/play` | 学生端游戏课件页 | 否 | 闯关地图、拖拽分类、竞速答题 |
 | `/report` | 班级数据报告 | 是 | 参与人数、完成率、正确率、排行榜 |
-| `/backend` | 权益与核销中心 | 是 | 租户侧核销、邀请码、权益查看 |
-| `/ops` | Ops 运营后台 | 是 | 平台侧管理 AI API、邀请码、核销码和数据库 |
+| `/backend` | 权益与核销中心 | 否 | 免登录生成邀请码；登录后核销、查看权益 |
+| `/ops` | Ops 运营后台 | 否 | 独立管理员登录；登录后管理 AI API、邀请码、核销码和数据库 |
 
 ## Demo 登录与权益
 
@@ -295,18 +323,19 @@ npm run preview
 
 入口：`/backend`
 
-面向老师和学校机构账号。
+面向老师、学校机构账号和未登录访客。
 
 功能：
 
-- 查看当前账户权益：
+- 未登录也可以生成邀请码。
+- 登录后查看当前账户权益：
   - 账户类型
   - 月额度剩余
   - 点券余额
   - 月度使用进度
 - 生成邀请码。
-- 核销月付码或点券码。
-- 快速进入 Ops 后台。
+- 登录后核销月付码或点券码。
+- 快速进入独立 Ops 管理员入口。
 
 ### 9. Ops 运营后台
 
@@ -316,6 +345,7 @@ npm run preview
 
 功能：
 
+- 独立管理员登录，不复用老师端 `/login`。
 - DeepSeek API 管理：
   - 通道名称
   - 供应商
@@ -502,11 +532,28 @@ AI API 通道配置表。
 ├── server
 │   ├── deepseekLessonApi.ts
 │   ├── deepseekLessonApi.test.ts
-│   └── lessonPrompt.ts
+│   ├── lessonPrompt.ts
+│   └── productionServer.mjs
 ├── prompts
 │   └── deepseek-lesson-generation.skill.md
 └── README.md
 ```
+
+## 前端主要文件
+
+如果要把前端交给其他 AI 改，优先给这些文件：
+
+- `src/App.tsx`：路由、登录态、权益状态、生成课件状态、页面装配。
+- `src/data/routes.ts`：侧边栏和页面路径。
+- `src/pages/AuthPage.tsx`：老师邀请码注册 / 登录页。
+- `src/pages/BackendConsole.tsx`：公开邀请码生成、登录后权益核销页。
+- `src/pages/OpsLoginPage.tsx`：独立管理员登录页。
+- `src/pages/OpsConsole.tsx`：管理员后台，管理 DeepSeek、用户点数、套餐、邀请码、核销码。
+- `src/pages/GenerateLesson.tsx`：AI 生成课件向导。
+- `src/pages/LessonEditor.tsx`：生成后可编辑的课件编辑器。
+- `src/pages/ShareLesson.tsx`、`src/pages/StudentPlay.tsx`：分享和学生端使用当前课件。
+- `src/components/`：按钮、卡片、布局、游戏组件等通用 UI。
+- `src/services/lessonAi.ts`：前端请求 `/api/ai/*` 的 AI 服务封装。
 
 ## 关键代码说明
 
@@ -569,6 +616,15 @@ AI API 通道配置表。
 - 只允许管理员保存和测试 DeepSeek 配置。
 - 从 `.keyou-ai-provider.local.json` 或环境变量读取 DeepSeek Key。
 - 调用 DeepSeek Chat Completions 并归一化为可编辑课件 JSON。
+
+### server/productionServer.mjs
+
+负责：
+
+- 服务器部署时运行 `dist` 静态文件和 `/api/ai/*` 代理。
+- 避免生产静态部署把 `/api/ai/session` fallback 成 `index.html`。
+- 支持 `PORT`、`HOST`、`DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL` 环境变量。
+- 支持 `KEYOU_ADMIN_USERNAME`、`KEYOU_ADMIN_PASSWORD` 覆盖默认管理员账号。
 
 ### server/lessonPrompt.ts 与 prompts/deepseek-lesson-generation.skill.md
 
@@ -754,7 +810,14 @@ keyou-ops-database
 
 ### 可以部署到静态网站吗？
 
-纯静态部署只能展示界面，不能保护 DeepSeek Key，也不能调用 `/api/ai/*`。如果要线上真实生成，需要把 `server/deepseekLessonApi.ts` 的逻辑放到 Node 后端、Serverless Function 或边缘函数中，同时配置 SPA fallback 到 `index.html`。
+纯静态部署只能展示界面，不能保护 DeepSeek Key，也不能调用 `/api/ai/*`。如果要线上真实生成，请在服务器运行：
+
+```bash
+npm run build
+PORT=4173 HOST=0.0.0.0 npm run start
+```
+
+或者让 Nginx/网关把 `/api/ai/*` 代理到这个 Node 服务，不能把 `/api/ai/*` fallback 到 `index.html`。
 
 ## 验证记录
 
@@ -771,6 +834,8 @@ npm run build
 - 单元测试通过：2 个测试文件，12 个测试用例。
 - TypeScript 类型检查通过。
 - Vite 生产构建通过。
+- `npm run start` 生产服务已验证 `/api/ai/session` 返回 JSON，不会 fallback 成 HTML。
+- `npm run start` 生产服务已验证 `/login` 返回前端页面，未知 `/api/ai/*` 返回 JSON 404。
 - 本地 DeepSeek 代理已用 `deepseek-chat` 完成真实连接测试。
 - 本地 DeepSeek 代理已生成真实课件 JSON：返回 5 个关卡，可进入编辑器继续编辑。
 - Chrome headless 已用桌面和移动视口截图检查 `/login` 与 `/play`，页面可加载且移动端标题不遮挡主体内容。

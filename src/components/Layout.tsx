@@ -14,8 +14,6 @@ type LayoutProps = {
 };
 
 export function Layout({ activeRoute, onNavigate, user, usage, onLogout, children }: LayoutProps) {
-  const visibleNavItems = mainNavItems.filter((item) => item.route !== "ops" || user?.role === "admin");
-
   return (
     <div className="app-background">
       <div className="cloud cloud-one" />
@@ -53,7 +51,7 @@ export function Layout({ activeRoute, onNavigate, user, usage, onLogout, childre
               )}
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {visibleNavItems.map((item) => (
+              {mainNavItems.map((item) => (
                 <button
                   key={item.route}
                   onClick={() => onNavigate(item.route)}

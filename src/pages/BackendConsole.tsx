@@ -16,8 +16,8 @@ import {
 import type { AppRoute } from "../data/routes";
 
 type BackendConsoleProps = {
-  user: AuthUser;
-  usage: UsageAccount;
+  user: AuthUser | null;
+  usage: UsageAccount | null;
   redeemedCodes: string[];
   redeemCodes: RedeemCode[];
   onRedeemCode: (code: string) => RedeemResult;
@@ -40,10 +40,15 @@ export function BackendConsole({
   const [invitePlan, setInvitePlan] = useState<BillingPlan>("monthly");
   const [generatedInvites, setGeneratedInvites] = useState<InviteCode[]>([]);
 
-  const monthlyRemaining = getRemainingMonthlyQuota(usage);
-  const usagePercent = usage.monthlyQuota > 0 ? (usage.monthlyUsed / usage.monthlyQuota) * 100 : 0;
+  const monthlyRemaining = usage ? getRemainingMonthlyQuota(usage) : 0;
+  const usagePercent = usage && usage.monthlyQuota > 0 ? (usage.monthlyUsed / usage.monthlyQuota) * 100 : 0;
 
   const redeem = () => {
+    if (!usage) {
+      setRedeemMessage("请先使用邀请码登录老师账号，再核销月付码或点券码。");
+      return;
+    }
+
     const result = onRedeemCode(redeemCode);
     setRedeemMessage(result.message);
   };
@@ -70,14 +75,14 @@ export function BackendConsole({
         <div>
           <h1 className="text-4xl font-black text-skybrand sm:text-6xl">权益与核销中心</h1>
           <p className="mt-3 text-xl font-bold text-ink">
-            管理邀请码、登录验证与月付/点券核销
+            免登录生成邀请码；登录后可核销月付/点券
           </p>
         </div>
         <Card className="p-4">
-          <p className="text-sm font-black text-slate-500">当前租户</p>
-          <p className="text-xl font-black text-ink">{user.organizationName}</p>
-          <Button className="mt-3" size="sm" variant="white" onClick={() => onNavigate("ops")}>
-            🗄️ 打开 Ops
+          <p className="text-sm font-black text-slate-500">{user ? "当前租户" : "当前状态"}</p>
+          <p className="text-xl font-black text-ink">{user?.organizationName ?? "未登录，可生成邀请码"}</p>
+          <Button className="mt-3" size="sm" variant="white" onClick={() => onNavigate(user ? "login" : "ops")}>
+            {user ? "切换账号" : "管理员入口"}
           </Button>
         </Card>
       </section>
@@ -85,27 +90,38 @@ export function BackendConsole({
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <Card tone="sun">
           <h2 className="text-2xl font-black text-ink">当前账户权益</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <Stat label="账户类型" value={getPlanLabel(usage.plan)} icon="🎫" />
-            <Stat label="月额度剩余" value={`${monthlyRemaining} 次`} icon="📅" />
-            <Stat label="点券余额" value={`${usage.points} 点`} icon="🪙" />
-          </div>
-          <div className="mt-5">
-            <ProgressBar value={usagePercent} label={`月度使用 ${usage.monthlyUsed}/${usage.monthlyQuota}`} color="sun" />
-          </div>
-          <p className="mt-4 rounded-2xl bg-white/76 p-3 text-sm font-bold text-slate-600">
-            月付用户：生成课件扣减月度额度。次付用户：每次生成扣减 80 点券。
-          </p>
+          {usage ? (
+            <>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <Stat label="账户类型" value={getPlanLabel(usage.plan)} icon="🎫" />
+                <Stat label="月额度剩余" value={`${monthlyRemaining} 次`} icon="📅" />
+                <Stat label="点券余额" value={`${usage.points} 点`} icon="🪙" />
+              </div>
+              <div className="mt-5">
+                <ProgressBar value={usagePercent} label={`月度使用 ${usage.monthlyUsed}/${usage.monthlyQuota}`} color="sun" />
+              </div>
+              <p className="mt-4 rounded-2xl bg-white/76 p-3 text-sm font-bold text-slate-600">
+                月付用户：生成课件扣减月度额度。次付用户：每次生成扣减 80 点券。
+              </p>
+            </>
+          ) : (
+            <div className="mt-4 rounded-3xl bg-white/78 p-5 font-bold leading-7 text-slate-600">
+              生成邀请码不需要登录。需要核销月付码、查看余额或生成 AI 课件时，再使用邀请码登录老师账号。
+              <Button className="mt-5" variant="white" onClick={() => onNavigate("login")}>
+                去老师登录
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card tone="blue">
           <h2 className="text-2xl font-black text-ink">AI 服务由管理员统一配置</h2>
           <p className="mt-4 rounded-3xl bg-white/80 p-4 font-bold leading-7 text-slate-600">
             老师端只负责生成课件、核销额度和管理邀请码，不展示 API Key、模型或接口设置。
-            如需配置真实 AI 通道，请使用管理员账号进入 Ops 后台。
+            如需配置真实 AI 通道，请使用管理员账号进入独立 `/ops` 后台。
           </p>
           <Button className="mt-5" variant="white" onClick={() => onNavigate("ops")}>
-            🗄️ 打开管理员后台
+            打开 /ops
           </Button>
         </Card>
       </div>

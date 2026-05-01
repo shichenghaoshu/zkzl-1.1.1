@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "./components/Button";
-import { Card } from "./components/Card";
 import { Layout } from "./components/Layout";
 import {
   consumeLessonGeneration,
@@ -26,6 +24,7 @@ import { ClassReport } from "./pages/ClassReport";
 import { GenerateLesson } from "./pages/GenerateLesson";
 import { LessonEditor } from "./pages/LessonEditor";
 import { OpsConsole } from "./pages/OpsConsole";
+import { OpsLoginPage } from "./pages/OpsLoginPage";
 import { ShareLesson } from "./pages/ShareLesson";
 import { StudentJoin } from "./pages/StudentJoin";
 import { StudentPlay } from "./pages/StudentPlay";
@@ -42,9 +41,7 @@ const protectedRoutes = new Set<AppRoute>([
   "generate",
   "editor",
   "share",
-  "report",
-  "backend",
-  "ops"
+  "report"
 ]);
 
 const readStoredJson = <T,>(key: string): T | null => {
@@ -289,7 +286,6 @@ export default function App() {
 
   const routeRequiresAuth = protectedRoutes.has(route) && !(route === "report" && studentReportUnlocked);
   const needsAuth = routeRequiresAuth && !authUser;
-  const needsAdmin = !needsAuth && route === "ops" && authUser?.role !== "admin";
 
   return (
     <Layout activeRoute={route} onNavigate={navigate} user={authUser} usage={usageAccount} onLogout={logout}>
@@ -336,7 +332,7 @@ export default function App() {
         <StudentPlay lesson={generatedLesson} onNavigate={navigate} onViewReport={openStudentReport} />
       ) : null}
       {!needsAuth && route === "report" ? <ClassReport /> : null}
-      {!needsAuth && route === "backend" && authUser && usageAccount ? (
+      {!needsAuth && route === "backend" ? (
         <BackendConsole
           user={authUser}
           usage={usageAccount}
@@ -347,7 +343,6 @@ export default function App() {
           onNavigate={navigate}
         />
       ) : null}
-      {needsAdmin ? <AdminOnlyNotice onNavigate={navigate} /> : null}
       {!needsAuth && route === "ops" && authUser?.role === "admin" ? (
         <OpsConsole
           database={opsDatabase}
@@ -355,30 +350,9 @@ export default function App() {
           onApplyTenantEntitlements={applyTenantEntitlements}
         />
       ) : null}
+      {!needsAuth && route === "ops" && authUser?.role !== "admin" ? (
+        <OpsLoginPage onLogin={login} onNavigate={navigate} />
+      ) : null}
     </Layout>
-  );
-}
-
-function AdminOnlyNotice({ onNavigate }: { onNavigate: (route: AppRoute) => void }) {
-  return (
-    <div className="space-y-6">
-      <section>
-        <h1 className="text-4xl font-black text-skybrand sm:text-6xl">无权限访问 Ops</h1>
-        <p className="mt-3 text-xl font-bold text-ink">
-          Ops 运营后台仅限管理员账户管理 AI API、邀请码、核销码和模拟数据库。
-        </p>
-      </section>
-      <Card tone="coral">
-        <p className="text-lg font-black text-ink">
-          当前账号不是管理员。请使用管理员账号登录，或返回老师端工作台继续演示。
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button onClick={() => onNavigate("teacher-dashboard")}>返回工作台</Button>
-          <Button variant="white" onClick={() => onNavigate("login")}>
-            切换账号
-          </Button>
-        </div>
-      </Card>
-    </div>
   );
 }
