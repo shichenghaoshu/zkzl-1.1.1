@@ -1,30 +1,56 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DragClassifyGame } from "../components/DragClassifyGame";
-import { mockLesson } from "../data/mockLessons";
+import { mockLesson, type Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
 
 type LessonEditorProps = {
+  lesson: Lesson | null;
   onNavigate: (route: AppRoute) => void;
 };
 
-const levelList = [
-  ["开场剧情", "剧情引入", "🏡"],
-  ["第1关 拖拽分类", "知识点巩固", "🍎"],
-  ["第2关 配对挑战", "知识点巩固", "🧩"],
-  ["第3关 竞速答题", "限时挑战", "⏱️"],
-  ["Boss关 综合闯关", "综合应用", "👾"]
-];
+const levelIcons = ["🏡", "🍎", "🧩", "⏱️", "👾", "⭐"];
 
-export function LessonEditor({ onNavigate }: LessonEditorProps) {
-  const [selectedLevel, setSelectedLevel] = useState(1);
-  const [question, setQuestion] = useState("把下面的分数拖到对应的分类中吧！");
+export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
+  const activeLesson = lesson ?? mockLesson;
+  const [selectedLevel, setSelectedLevel] = useState(0);
+  const selectedScene = activeLesson.scenes[selectedLevel] ?? activeLesson.scenes[0];
+  const firstQuestion = selectedScene?.questions[0];
+  const [question, setQuestion] = useState(firstQuestion?.prompt ?? selectedScene?.description ?? "");
   const [optionCount, setOptionCount] = useState(5);
   const [timeLimit, setTimeLimit] = useState(60);
   const [stars, setStars] = useState(3);
   const [difficulty, setDifficulty] = useState("标准");
   const [notice, setNotice] = useState("已生成一节完整互动游戏课，老师可以快速改题、换关卡、调顺序。");
+  const levelList = useMemo(
+    () =>
+      activeLesson.scenes.map((scene, index) => [
+        scene.title,
+        scene.description || "AI 生成关卡",
+        levelIcons[index] ?? "⭐"
+      ]),
+    [activeLesson]
+  );
+  const totalStars = activeLesson.scenes.reduce((sum, scene) => sum + scene.rewards.stars, 0);
+
+  useEffect(() => {
+    if (selectedLevel >= activeLesson.scenes.length) {
+      setSelectedLevel(0);
+    }
+  }, [activeLesson.scenes.length, selectedLevel]);
+
+  useEffect(() => {
+    setQuestion(firstQuestion?.prompt ?? selectedScene?.description ?? "");
+    setOptionCount(firstQuestion?.options.length || 4);
+    setStars(selectedScene?.rewards.stars ?? 3);
+  }, [firstQuestion, selectedScene]);
+
+  useEffect(() => {
+    if (lesson) {
+      setNotice(`已载入 AI 生成课件：${lesson.title}，可继续编辑题目、关卡和奖励。`);
+    }
+  }, [lesson]);
 
   return (
     <div className="space-y-6">
@@ -85,11 +111,16 @@ export function LessonEditor({ onNavigate }: LessonEditorProps) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-black text-ink">编辑画布（实时预览）</h2>
-              <p className="text-sm font-bold text-slate-500">{mockLesson.title}</p>
+              <p className="text-sm font-bold text-slate-500">{activeLesson.title}</p>
             </div>
             <div className="rounded-2xl bg-white px-4 py-2 text-sm font-black text-skybrand shadow-sm">
-              ⭐ 24
+              ⭐ {totalStars}
             </div>
+          </div>
+
+          <div className="mb-4 rounded-3xl bg-blue-50 p-4">
+            <p className="font-black text-ink">{selectedScene?.title}</p>
+            <p className="mt-1 text-sm font-bold leading-6 text-slate-600">{selectedScene?.description}</p>
           </div>
 
           <DragClassifyGame
@@ -134,7 +165,7 @@ export function LessonEditor({ onNavigate }: LessonEditorProps) {
             <div className="flex items-center justify-between rounded-2xl bg-blue-50 p-3">
               <span className="font-black text-slate-600">正确答案按钮</span>
               <Button size="sm" variant="white">
-                查看答案
+                {firstQuestion?.answer ?? "查看答案"}
               </Button>
             </div>
             <label className="block">

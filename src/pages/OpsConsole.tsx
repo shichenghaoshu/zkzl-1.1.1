@@ -10,6 +10,7 @@ import {
   type MockDatabase
 } from "../data/mockDatabase";
 import { getPlanLabel, maskCredential, type BillingPlan } from "../data/mockCommerce";
+import { testAiProviderConnection } from "../services/lessonAi";
 
 type OpsConsoleProps = {
   database: MockDatabase;
@@ -24,6 +25,7 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
   const selectedApi = database.apiProviders.find((item) => item.id === selectedApiId) ?? database.apiProviders[0];
   const [apiDraft, setApiDraft] = useState<ApiProviderConfig>(selectedApi);
   const [message, setMessage] = useState("Ops 改动会写入浏览器 localStorage 模拟数据库。");
+  const [testingApi, setTestingApi] = useState(false);
   const [inviteOrg, setInviteOrg] = useState("晨光教培中心");
   const [invitePlan, setInvitePlan] = useState<BillingPlan>("monthly");
   const [redeemTenant, setRedeemTenant] = useState("星河小学");
@@ -65,10 +67,19 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
     setMessage(`已保存 AI API：${apiDraft.name}`);
   };
 
-  const testApi = () => {
-    const nextDb = addAuditLog(database, "Ops管理员", "测试 AI API 连接", apiDraft.baseUrl);
+  const testApi = async () => {
+    setTestingApi(true);
+    setMessage("正在请求管理员配置的 AI 通道...");
+    const result = await testAiProviderConnection(apiDraft);
+    const nextDb = addAuditLog(
+      database,
+      "Ops管理员",
+      result.ok ? "测试 AI API 连接" : "AI API 连接失败",
+      `${apiDraft.name}：${result.message}`
+    );
     onUpdateDatabase(nextDb);
-    setMessage(`连接测试通过：${apiDraft.provider} / ${apiDraft.model}`);
+    setMessage(result.message);
+    setTestingApi(false);
   };
 
   const addInvite = () => {
@@ -251,7 +262,9 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button onClick={saveApi}>💾 保存到数据库</Button>
-              <Button variant="mint" onClick={testApi}>🧪 测试连接</Button>
+              <Button variant="mint" onClick={testApi} disabled={testingApi}>
+                {testingApi ? "测试中" : "🧪 测试连接"}
+              </Button>
             </div>
           </Card>
         </div>

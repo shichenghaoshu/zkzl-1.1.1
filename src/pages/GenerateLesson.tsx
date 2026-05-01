@@ -10,11 +10,16 @@ import {
   type RedeemResult,
   type UsageAccount
 } from "../data/mockCommerce";
+import type { ApiProviderConfig } from "../data/mockDatabase";
+import type { Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
+import { generateLessonWithAi, getAiProviderStatus } from "../services/lessonAi";
 
 type GenerateLessonProps = {
   usage: UsageAccount;
+  apiProviders: ApiProviderConfig[];
   onConsumeGeneration: () => RedeemResult;
+  onGeneratedLesson: (lesson: Lesson) => void;
   onNavigate: (route: AppRoute) => void;
 };
 
@@ -23,7 +28,13 @@ const gradeOptions = ["小学低段", "小学中段", "小学高段"];
 const subjects = ["数学", "英语", "科学", "班会"];
 const modes = ["闯关地图", "竞速答题", "拖拽分类", "翻卡记忆", "知识配对", "转盘挑战"];
 
-export function GenerateLesson({ usage, onConsumeGeneration, onNavigate }: GenerateLessonProps) {
+export function GenerateLesson({
+  usage,
+  apiProviders,
+  onConsumeGeneration,
+  onGeneratedLesson,
+  onNavigate
+}: GenerateLessonProps) {
   const [topic, setTopic] = useState("三年级数学：认识分数");
   const [grade, setGrade] = useState("小学中段");
   const [subject, setSubject] = useState("数学");
@@ -33,34 +44,65 @@ export function GenerateLesson({ usage, onConsumeGeneration, onNavigate }: Gener
   const [progress, setProgress] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
   const [usageNotice, setUsageNotice] = useState(canGenerateLesson(usage).message);
+  const apiStatus = getAiProviderStatus(apiProviders);
 
-  const generate = () => {
-    const result = onConsumeGeneration();
-    setUsageNotice(result.message);
-    if (!result.ok) return;
+  const generate = async () => {
+    if (generating) return;
+
+    const quotaCheck = canGenerateLesson(usage);
+    setUsageNotice(quotaCheck.message);
+    if (!quotaCheck.ok) return;
+
     setGenerating(true);
+    setProgress(8);
+    setStageIndex(0);
+
+    const aiResult = await generateLessonWithAi(
+      {
+        topic,
+        grade,
+        subject,
+        mode,
+        studentCount
+      },
+      apiProviders
+    );
+
+    if (!aiResult.ok) {
+      setGenerating(false);
+      setUsageNotice(aiResult.message);
+      return;
+    }
+
+    const usageResult = onConsumeGeneration();
+    if (!usageResult.ok) {
+      setGenerating(false);
+      setUsageNotice(usageResult.message);
+      return;
+    }
+
+    setProgress(100);
+    setStageIndex(stages.length - 1);
+    setUsageNotice(`${aiResult.message} ${usageResult.message}`);
+    onGeneratedLesson(aiResult.lesson);
+    window.setTimeout(() => onNavigate("editor"), 500);
   };
 
   useEffect(() => {
     if (!generating) return;
 
-    setProgress(0);
-    setStageIndex(0);
     const interval = window.setInterval(() => {
-      setProgress((current) => Math.min(100, current + 12.5));
-      setStageIndex((current) => Math.min(stages.length - 1, current + 1));
-    }, 350);
-
-    const timer = window.setTimeout(() => {
-      window.clearInterval(interval);
-      onNavigate("editor");
-    }, 2200);
+      setProgress((current) => {
+        const next = Math.min(92, current + 7);
+        setStageIndex(Math.min(stages.length - 1, Math.floor(next / 25)));
+        return next;
+      });
+    }, 450);
 
     return () => {
       window.clearInterval(interval);
-      window.clearTimeout(timer);
     };
-  }, [generating, onNavigate]);
+  }, [generating]);
 
   return (
     <div className="space-y-6">
@@ -157,7 +199,7 @@ export function GenerateLesson({ usage, onConsumeGeneration, onNavigate }: Gener
             <div className="relative z-10 max-w-sm">
               <h2 className="text-3xl font-black text-skybrand">AI生成结果 ✨</h2>
               <p className="mt-2 text-sm font-bold text-slate-500">
-                自动拆解教学目标、题目与游戏模板
+                由管理员统一配置 AI 服务，老师端不暴露密钥设置
               </p>
             </div>
 
@@ -189,10 +231,13 @@ export function GenerateLesson({ usage, onConsumeGeneration, onNavigate }: Gener
               onClick={generate}
               disabled={generating}
             >
-              ✨ 一键生成游戏课
+              {generating ? "正在生成" : "✨ 一键生成游戏课"}
             </Button>
             <div className="relative z-10 mt-4 rounded-2xl bg-white/82 p-3 text-sm font-black text-slate-600">
               {usageNotice}
+            </div>
+            <div className="relative z-10 mt-3 rounded-2xl bg-white/70 p-3 text-xs font-black text-slate-500">
+              {apiStatus.ok ? "AI 服务已就绪" : "AI 服务未就绪，请联系管理员配置"}
             </div>
           </Card>
         </div>

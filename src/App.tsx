@@ -4,7 +4,6 @@ import { Card } from "./components/Card";
 import { Layout } from "./components/Layout";
 import {
   consumeLessonGeneration,
-  generateApiCredential,
   type InviteCode,
   redeemUsageCode,
   type AuthUser,
@@ -19,6 +18,7 @@ import {
   type MockDatabase
 } from "./data/mockDatabase";
 import { pathToRoute, routePaths, type AppRoute } from "./data/routes";
+import type { Lesson } from "./data/mockLessons";
 import { AuthPage } from "./pages/AuthPage";
 import { BackendConsole } from "./pages/BackendConsole";
 import { ClassReport } from "./pages/ClassReport";
@@ -55,6 +55,7 @@ const readStoredJson = <T,>(key: string): T | null => {
 };
 
 const accountStoreKey = "keyou-account-store";
+const generatedLessonKey = "keyou-generated-lesson";
 
 type StoredAccountRecord = {
   user: AuthUser;
@@ -76,6 +77,9 @@ export default function App() {
     () => readStoredJson<Record<string, StoredAccountRecord>>(accountStoreKey) ?? {}
   );
   const [opsDatabase, setOpsDatabase] = useState<MockDatabase>(() => readStoredDatabase());
+  const [generatedLesson, setGeneratedLesson] = useState<Lesson | null>(() =>
+    readStoredJson<Lesson>(generatedLessonKey)
+  );
   const [studentReportUnlocked, setStudentReportUnlocked] = useState(false);
 
   const navigate = useCallback((nextRoute: AppRoute) => {
@@ -103,7 +107,7 @@ export default function App() {
       student: "学生端加入页",
       play: "学生端游戏课件页",
       report: "班级数据报告",
-      backend: "后端/API 配置中心",
+      backend: "权益与核销中心",
       ops: "Ops 运营后台"
     };
     document.title = `${titles[route]} | 课游AI`;
@@ -147,6 +151,12 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(databaseStorageKey, JSON.stringify(opsDatabase));
   }, [opsDatabase]);
+
+  useEffect(() => {
+    if (generatedLesson) {
+      window.localStorage.setItem(generatedLessonKey, JSON.stringify(generatedLesson));
+    }
+  }, [generatedLesson]);
 
   const login = (user: AuthUser, usage: UsageAccount, nextRoute: AppRoute) => {
     const accountKey = user.inviteCode.toUpperCase();
@@ -237,22 +247,6 @@ export default function App() {
     return result;
   };
 
-  const generateCredential = () => {
-    if (!authUser || !usageAccount) {
-      throw new Error("请先登录后再生成 API 凭证。");
-    }
-
-    const nextUsage = {
-      ...usageAccount,
-      apiCredential: generateApiCredential(authUser)
-    };
-    setUsageAccount(nextUsage);
-    setOpsDatabase((current) =>
-      addAuditLog(current, authUser.name, "生成用户 API 凭证", authUser.organizationName)
-    );
-    return nextUsage;
-  };
-
   const updateOpsDatabase = (database: MockDatabase) => {
     setOpsDatabase(database);
   };
@@ -310,9 +304,15 @@ export default function App() {
         <TeacherDashboard user={authUser} usage={usageAccount} onNavigate={navigate} />
       ) : null}
       {!needsAuth && route === "generate" && usageAccount ? (
-        <GenerateLesson usage={usageAccount} onConsumeGeneration={consumeGeneration} onNavigate={navigate} />
+        <GenerateLesson
+          usage={usageAccount}
+          apiProviders={opsDatabase.apiProviders}
+          onConsumeGeneration={consumeGeneration}
+          onGeneratedLesson={setGeneratedLesson}
+          onNavigate={navigate}
+        />
       ) : null}
-      {!needsAuth && route === "editor" ? <LessonEditor onNavigate={navigate} /> : null}
+      {!needsAuth && route === "editor" ? <LessonEditor lesson={generatedLesson} onNavigate={navigate} /> : null}
       {!needsAuth && route === "share" ? <ShareLesson onNavigate={navigate} /> : null}
       {route === "student" ? <StudentJoin onNavigate={navigate} /> : null}
       {route === "play" ? <StudentPlay onNavigate={navigate} onViewReport={openStudentReport} /> : null}
@@ -324,8 +324,6 @@ export default function App() {
           redeemedCodes={redeemedCodes}
           redeemCodes={opsDatabase.redeemCodes}
           onRedeemCode={redeemCode}
-          onGenerateCredential={generateCredential}
-          onUpdateUsage={setUsageAccount}
           onCreateInvite={createInviteFromBackend}
           onNavigate={navigate}
         />
