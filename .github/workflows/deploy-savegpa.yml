@@ -305,5 +305,14 @@ jobs:
             --data '{"mode":"invite","inviteCode":"TRIAL-SMOKE"}' \
             http://127.0.0.1:4173/api/ai/session >/dev/null
 
-          find "$SITE_DIR/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
+          CURRENT_RELEASE="$(readlink -f "$SITE_DIR/current")"
+          find "$SITE_DIR/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\0' \
+            | sort -z -n \
+            | head -z -n -5 \
+            | while IFS= read -r -d '' entry; do
+                release_path="${entry#* }"
+                if [ "$(readlink -f "$release_path")" != "$CURRENT_RELEASE" ]; then
+                  rm -rf "$release_path"
+                fi
+              done
           REMOTE
