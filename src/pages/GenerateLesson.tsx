@@ -7,15 +7,17 @@ import {
   canGenerateLesson,
   getPlanLabel,
   getRemainingMonthlyQuota,
+  type AuthUser,
   type RedeemResult,
   type UsageAccount
 } from "../data/mockCommerce";
 import type { ApiProviderConfig } from "../data/mockDatabase";
 import type { Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
-import { generateLessonWithAi, getAiProviderStatus } from "../services/lessonAi";
+import { generateLessonWithAi, getAiProviderStatus, refreshAiSessionForUser } from "../services/lessonAi";
 
 type GenerateLessonProps = {
+  user: AuthUser | null;
   usage: UsageAccount;
   apiProviders: ApiProviderConfig[];
   onConsumeGeneration: () => RedeemResult;
@@ -29,6 +31,7 @@ const subjects = ["数学", "英语", "科学", "班会"];
 const modes = ["闯关地图", "竞速答题", "拖拽分类", "翻卡记忆", "知识配对", "转盘挑战"];
 
 export function GenerateLesson({
+  user,
   usage,
   apiProviders,
   onConsumeGeneration,
@@ -56,6 +59,13 @@ export function GenerateLesson({
     setGenerating(true);
     setProgress(8);
     setStageIndex(0);
+
+    const session = await refreshAiSessionForUser(user);
+    if (!session.ok) {
+      setGenerating(false);
+      setUsageNotice(session.message);
+      return;
+    }
 
     const aiResult = await generateLessonWithAi(
       {

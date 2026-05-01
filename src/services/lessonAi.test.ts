@@ -5,6 +5,7 @@ import {
   createAiSession,
   generateLessonWithAi,
   getAiProviderStatus,
+  refreshAiSessionForUser,
   testAiProviderConnection
 } from "./lessonAi";
 
@@ -173,5 +174,54 @@ describe("lesson AI generation", () => {
     expect(result.ok).toBe(false);
     expect(result.message).toContain("本地 /api/ai 代理");
     expect(result.message).not.toContain("Unexpected token");
+  });
+
+  it("refreshes the teacher AI session from the stored invite user before generation", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, token: "session-fresh", message: "AI 会话已建立。" })
+    });
+
+    const result = await refreshAiSessionForUser(
+      {
+        id: "user-demo",
+        name: "王老师",
+        organizationName: "三年级数学教研组",
+        role: "teacher",
+        inviteCode: "KEYOU-DEMO-2026",
+        createdAt: "2026-05-01T00:00:00.000Z"
+      },
+      fetchImpl
+    );
+
+    expect(result.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/ai/session",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          mode: "invite",
+          inviteCode: "KEYOU-DEMO-2026",
+          name: "王老师",
+          organizationName: "三年级数学教研组"
+        })
+      })
+    );
+  });
+
+  it("explains 401 generation failures as an expired AI session instead of an Ops config issue", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () => JSON.stringify({ ok: false, message: "请先登录后再使用 AI 服务。" }),
+      json: async () => ({ ok: false, message: "请先登录后再使用 AI 服务。" })
+    });
+
+    const result = await generateLessonWithAi(input, [baseProvider], fetchImpl);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("AI 会话已过期或未建立");
+    expect(result.message).not.toContain("Base URL");
+    expect(result.message).not.toContain("API Key");
   });
 });

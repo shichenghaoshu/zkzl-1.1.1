@@ -316,6 +316,7 @@ export default function App() {
       ) : null}
       {!needsAuth && route === "generate" && usageAccount ? (
         <GenerateLesson
+          user={authUser}
           usage={usageAccount}
           apiProviders={opsDatabase.apiProviders}
           onConsumeGeneration={consumeGeneration}

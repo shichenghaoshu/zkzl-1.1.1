@@ -1,4 +1,5 @@
 import type { ApiProviderConfig } from "../data/mockDatabase";
+import type { AuthUser } from "../data/mockCommerce";
 import type { Lesson, Question, Scene } from "../data/mockLessons";
 
 export type LessonGenerationInput = {
@@ -97,10 +98,19 @@ export async function generateLessonWithAi(
     });
 
     if (!response.ok) {
+      const errorText = await readErrorText(response);
+      if (response.status === 401 || errorText.includes("请先登录")) {
+        return {
+          ok: false,
+          providerName: provider.name,
+          message: `AI 会话已过期或未建立：${errorText}。请重新使用邀请码登录后再生成。`
+        };
+      }
+
       return {
         ok: false,
         providerName: provider.name,
-        message: `AI 生成失败：${await readErrorText(response)}。请检查 Ops 后台的 DeepSeek Base URL、模型和 API Key。`
+        message: `AI 生成失败：${errorText}。请检查 Ops 后台的 DeepSeek Base URL、模型和 API Key。`
       };
     }
 
@@ -222,6 +232,29 @@ export async function createAiSession(
       message: `AI 会话建立失败：${error instanceof Error ? error.message : "未知错误"}`
     };
   }
+}
+
+export async function refreshAiSessionForUser(
+  user: AuthUser | null,
+  fetchImpl: FetchLike = fetch
+): Promise<{ ok: boolean; message: string; token?: string }> {
+  if (!user) {
+    return { ok: false, message: "请先使用邀请码登录后再生成课件。" };
+  }
+
+  if (user.role !== "teacher") {
+    return { ok: false, message: "请使用老师邀请码账号生成课件；管理员账号仅用于 Ops 配置。" };
+  }
+
+  return createAiSession(
+    {
+      mode: "invite",
+      inviteCode: user.inviteCode,
+      name: user.name,
+      organizationName: user.organizationName
+    },
+    fetchImpl
+  );
 }
 
 export function saveAiSessionToken(token: string) {
