@@ -15,7 +15,8 @@ import {
   addUsageLog,
   databaseStorageKey,
   readStoredDatabase,
-  type MockDatabase
+  type MockDatabase,
+  type TenantRecord
 } from "./data/mockDatabase";
 import { pathToRoute, routePaths, type AppRoute } from "./data/routes";
 import type { Lesson } from "./data/mockLessons";
@@ -29,6 +30,7 @@ import { ShareLesson } from "./pages/ShareLesson";
 import { StudentJoin } from "./pages/StudentJoin";
 import { StudentPlay } from "./pages/StudentPlay";
 import { TeacherDashboard } from "./pages/TeacherDashboard";
+import { clearAiSessionToken } from "./services/lessonAi";
 
 function getInitialRoute() {
   if (window.location.pathname === "/") return "teacher-dashboard" as AppRoute;
@@ -186,6 +188,7 @@ export default function App() {
     setAuthUser(null);
     setUsageAccount(null);
     setRedeemedCodes([]);
+    clearAiSessionToken();
     navigate("login");
   };
 
@@ -267,6 +270,18 @@ export default function App() {
     );
   };
 
+  const applyTenantEntitlements = (tenant: TenantRecord) => {
+    if (!authUser || !usageAccount) return;
+    if (authUser.organizationName !== tenant.name) return;
+
+    setUsageAccount({
+      ...usageAccount,
+      plan: tenant.plan,
+      monthlyQuota: tenant.monthlyQuota,
+      points: tenant.points
+    });
+  };
+
   const openStudentReport = () => {
     setStudentReportUnlocked(true);
     navigate("report");
@@ -312,10 +327,14 @@ export default function App() {
           onNavigate={navigate}
         />
       ) : null}
-      {!needsAuth && route === "editor" ? <LessonEditor lesson={generatedLesson} onNavigate={navigate} /> : null}
-      {!needsAuth && route === "share" ? <ShareLesson onNavigate={navigate} /> : null}
+      {!needsAuth && route === "editor" ? (
+        <LessonEditor lesson={generatedLesson} onUpdateLesson={setGeneratedLesson} onNavigate={navigate} />
+      ) : null}
+      {!needsAuth && route === "share" ? <ShareLesson lesson={generatedLesson} onNavigate={navigate} /> : null}
       {route === "student" ? <StudentJoin onNavigate={navigate} /> : null}
-      {route === "play" ? <StudentPlay onNavigate={navigate} onViewReport={openStudentReport} /> : null}
+      {route === "play" ? (
+        <StudentPlay lesson={generatedLesson} onNavigate={navigate} onViewReport={openStudentReport} />
+      ) : null}
       {!needsAuth && route === "report" ? <ClassReport /> : null}
       {!needsAuth && route === "backend" && authUser && usageAccount ? (
         <BackendConsole
@@ -330,7 +349,11 @@ export default function App() {
       ) : null}
       {needsAdmin ? <AdminOnlyNotice onNavigate={navigate} /> : null}
       {!needsAuth && route === "ops" && authUser?.role === "admin" ? (
-        <OpsConsole database={opsDatabase} onUpdateDatabase={updateOpsDatabase} />
+        <OpsConsole
+          database={opsDatabase}
+          onUpdateDatabase={updateOpsDatabase}
+          onApplyTenantEntitlements={applyTenantEntitlements}
+        />
       ) : null}
     </Layout>
   );
@@ -347,7 +370,7 @@ function AdminOnlyNotice({ onNavigate }: { onNavigate: (route: AppRoute) => void
       </section>
       <Card tone="coral">
         <p className="text-lg font-black text-ink">
-          当前账号不是管理员。请使用月付或点券机构邀请码登录，或返回老师端工作台继续演示。
+          当前账号不是管理员。请使用管理员账号登录，或返回老师端工作台继续演示。
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button onClick={() => onNavigate("teacher-dashboard")}>返回工作台</Button>

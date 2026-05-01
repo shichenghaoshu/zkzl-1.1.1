@@ -7,20 +7,19 @@ import type { AppRoute } from "../data/routes";
 
 type LessonEditorProps = {
   lesson: Lesson | null;
+  onUpdateLesson: (lesson: Lesson) => void;
   onNavigate: (route: AppRoute) => void;
 };
 
 const levelIcons = ["🏡", "🍎", "🧩", "⏱️", "👾", "⭐"];
 
-export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
+export function LessonEditor({ lesson, onUpdateLesson, onNavigate }: LessonEditorProps) {
   const activeLesson = lesson ?? mockLesson;
   const [selectedLevel, setSelectedLevel] = useState(0);
   const selectedScene = activeLesson.scenes[selectedLevel] ?? activeLesson.scenes[0];
   const firstQuestion = selectedScene?.questions[0];
-  const [question, setQuestion] = useState(firstQuestion?.prompt ?? selectedScene?.description ?? "");
   const [optionCount, setOptionCount] = useState(5);
   const [timeLimit, setTimeLimit] = useState(60);
-  const [stars, setStars] = useState(3);
   const [difficulty, setDifficulty] = useState("标准");
   const [notice, setNotice] = useState("已生成一节完整互动游戏课，老师可以快速改题、换关卡、调顺序。");
   const levelList = useMemo(
@@ -33,6 +32,19 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
     [activeLesson]
   );
   const totalStars = activeLesson.scenes.reduce((sum, scene) => sum + scene.rewards.stars, 0);
+  const previewConfig = useMemo(() => {
+    const options = firstQuestion?.options?.length ? firstQuestion.options : ["选项 A", "选项 B", "选项 C"];
+    const categories = ["正确答案", "其他选项"];
+    return {
+      prompt: firstQuestion?.prompt || selectedScene?.description || "编辑题目后可在这里预览。",
+      categories,
+      items: options,
+      answerMap: options.reduce<Record<string, string>>((acc, option) => {
+        acc[option] = option === firstQuestion?.answer ? "正确答案" : "其他选项";
+        return acc;
+      }, {})
+    };
+  }, [firstQuestion, selectedScene?.description]);
 
   useEffect(() => {
     if (selectedLevel >= activeLesson.scenes.length) {
@@ -41,9 +53,7 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
   }, [activeLesson.scenes.length, selectedLevel]);
 
   useEffect(() => {
-    setQuestion(firstQuestion?.prompt ?? selectedScene?.description ?? "");
     setOptionCount(firstQuestion?.options.length || 4);
-    setStars(selectedScene?.rewards.stars ?? 3);
   }, [firstQuestion, selectedScene]);
 
   useEffect(() => {
@@ -51,6 +61,55 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
       setNotice(`已载入 AI 生成课件：${lesson.title}，可继续编辑题目、关卡和奖励。`);
     }
   }, [lesson]);
+
+  const updateLesson = (updater: (current: Lesson) => Lesson) => {
+    const nextLesson = updater(activeLesson);
+    onUpdateLesson(nextLesson);
+    setNotice("已更新课件内容，生成后的关卡和题目会保存在本机。");
+  };
+
+  const updateSelectedScene = (updater: (scene: Lesson["scenes"][number]) => Lesson["scenes"][number]) => {
+    updateLesson((current) => ({
+      ...current,
+      scenes: current.scenes.map((scene, index) => (index === selectedLevel ? updater(scene) : scene))
+    }));
+  };
+
+  const updateFirstQuestion = (updater: (question: NonNullable<typeof firstQuestion>) => NonNullable<typeof firstQuestion>) => {
+    updateSelectedScene((scene) => {
+      const fallbackQuestion = {
+        id: `q-${scene.id || selectedLevel + 1}-1`,
+        prompt: "",
+        options: ["选项 A", "选项 B", "选项 C"],
+        answer: "选项 A"
+      };
+      const questions = scene.questions.length ? scene.questions : [fallbackQuestion];
+      return {
+        ...scene,
+        questions: questions.map((question, index) => (index === 0 ? updater(question) : question))
+      };
+    });
+  };
+
+  const updateOption = (optionIndex: number, value: string) => {
+    updateFirstQuestion((question) => ({
+      ...question,
+      options: question.options.map((option, index) => (index === optionIndex ? value : option))
+    }));
+  };
+
+  const resizeOptions = (nextCount: number) => {
+    const safeCount = Math.max(2, Math.min(8, nextCount));
+    setOptionCount(safeCount);
+    updateFirstQuestion((question) => {
+      const nextOptions = [...question.options];
+      while (nextOptions.length < safeCount) nextOptions.push(`选项 ${nextOptions.length + 1}`);
+      return {
+        ...question,
+        options: nextOptions.slice(0, safeCount)
+      };
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -119,12 +178,21 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
           </div>
 
           <div className="mb-4 rounded-3xl bg-blue-50 p-4">
-            <p className="font-black text-ink">{selectedScene?.title}</p>
-            <p className="mt-1 text-sm font-bold leading-6 text-slate-600">{selectedScene?.description}</p>
+            <input
+              className="w-full rounded-2xl border border-blue-100 bg-white px-3 py-2 font-black text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+              value={selectedScene?.title ?? ""}
+              onChange={(event) => updateSelectedScene((scene) => ({ ...scene, title: event.target.value }))}
+            />
+            <textarea
+              className="mt-3 min-h-20 w-full rounded-2xl border border-blue-100 bg-white p-3 text-sm font-bold leading-6 text-slate-600 outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+              value={selectedScene?.description ?? ""}
+              onChange={(event) => updateSelectedScene((scene) => ({ ...scene, description: event.target.value }))}
+            />
           </div>
 
           <DragClassifyGame
             mode="editor"
+            config={previewConfig}
             onComplete={() => setNotice("学生答对后会显示星星奖励，课堂参与数据同步进入报告。")}
           />
 
@@ -147,8 +215,8 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
               <span className="mb-2 block text-sm font-black text-slate-600">题目输入框</span>
               <textarea
                 className="min-h-24 w-full rounded-2xl border border-blue-100 bg-white p-3 font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
+                value={firstQuestion?.prompt ?? ""}
+                onChange={(event) => updateFirstQuestion((question) => ({ ...question, prompt: event.target.value }))}
               />
             </label>
             <label className="block">
@@ -159,15 +227,38 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
                 min={2}
                 max={8}
                 value={optionCount}
-                onChange={(event) => setOptionCount(Number(event.target.value))}
+                onChange={(event) => resizeOptions(Number(event.target.value))}
               />
             </label>
-            <div className="flex items-center justify-between rounded-2xl bg-blue-50 p-3">
-              <span className="font-black text-slate-600">正确答案按钮</span>
-              <Button size="sm" variant="white">
-                {firstQuestion?.answer ?? "查看答案"}
-              </Button>
+            <div className="space-y-3 rounded-2xl bg-blue-50 p-3">
+              <p className="font-black text-slate-600">选项</p>
+              {(firstQuestion?.options ?? []).map((option, index) => (
+                <input
+                  key={`${firstQuestion?.id ?? "question"}-${index}`}
+                  className="min-h-11 w-full rounded-2xl border border-blue-100 bg-white px-3 text-sm font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+                  value={option}
+                  onChange={(event) => updateOption(index, event.target.value)}
+                />
+              ))}
             </div>
+            <label className="block">
+              <span className="mb-2 block text-sm font-black text-slate-600">正确答案</span>
+              <input
+                className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+                value={firstQuestion?.answer ?? ""}
+                onChange={(event) => updateFirstQuestion((question) => ({ ...question, answer: event.target.value }))}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-black text-slate-600">答案解释</span>
+              <textarea
+                className="min-h-20 w-full rounded-2xl border border-blue-100 bg-white p-3 text-sm font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+                value={firstQuestion?.explanation ?? ""}
+                onChange={(event) =>
+                  updateFirstQuestion((question) => ({ ...question, explanation: event.target.value }))
+                }
+              />
+            </label>
             <label className="block">
               <span className="mb-2 block text-sm font-black text-slate-600">时间限制：{timeLimit} 秒</span>
               <input
@@ -181,14 +272,21 @@ export function LessonEditor({ lesson, onNavigate }: LessonEditorProps) {
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm font-black text-slate-600">奖励星星：{stars} 星</span>
+              <span className="mb-2 block text-sm font-black text-slate-600">
+                奖励星星：{selectedScene?.rewards.stars ?? 3} 星
+              </span>
               <input
                 className="w-full accent-sunbrand"
                 type="range"
                 min={1}
                 max={5}
-                value={stars}
-                onChange={(event) => setStars(Number(event.target.value))}
+                value={selectedScene?.rewards.stars ?? 3}
+                onChange={(event) =>
+                  updateSelectedScene((scene) => ({
+                    ...scene,
+                    rewards: { ...scene.rewards, stars: Number(event.target.value) }
+                  }))
+                }
               />
             </label>
             <div>

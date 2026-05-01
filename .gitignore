@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+.keyou-ai-provider.local.json
 
 *.tsbuildinfo
 vite.config.js

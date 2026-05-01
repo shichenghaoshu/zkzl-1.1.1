@@ -5,32 +5,49 @@ import { DragClassifyGame } from "../components/DragClassifyGame";
 import { GameMap } from "../components/GameMap";
 import { ProgressBar } from "../components/ProgressBar";
 import { QuizRaceGame } from "../components/QuizRaceGame";
+import { mockLesson, type Lesson, type Question, type Scene } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
 
 type StudentPlayProps = {
+  lesson: Lesson | null;
   onNavigate: (route: AppRoute) => void;
   onViewReport: () => void;
 };
 
-export function StudentPlay({ onNavigate, onViewReport }: StudentPlayProps) {
+export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayProps) {
+  const activeLesson = lesson ?? mockLesson;
+  const levelCount = activeLesson.scenes.length;
   const [activeLevel, setActiveLevel] = useState<number | null>(null);
-  const [stars, setStars] = useState(125);
-  const [coins, setCoins] = useState(860);
-  const [progress, setProgress] = useState(4);
+  const [stars, setStars] = useState(0);
+  const [coins, setCoins] = useState(0);
+  const [progress, setProgress] = useState(0);
   const rewardedLevelRef = useRef<Set<number>>(new Set());
+  const activeScene = activeLevel === null ? null : activeLesson.scenes[activeLevel];
+  const activeQuestion = activeScene?.questions[0];
+  const mapLevels = activeLesson.scenes.map((scene, index) => ({
+    id: scene.id,
+    name: scene.title,
+    stars: index < progress ? scene.rewards.stars : 0,
+    status:
+      index < progress
+        ? "done"
+        : index === progress
+          ? "current"
+          : "locked"
+  })) satisfies Array<{ id: string; name: string; stars: number; status: "done" | "current" | "locked" }>;
 
   const reward = () => {
     if (activeLevel === null || rewardedLevelRef.current.has(activeLevel)) return;
 
     rewardedLevelRef.current.add(activeLevel);
-    setStars((value) => value + 3);
-    setCoins((value) => value + 20);
-    setProgress((value) => Math.min(5, Math.max(value, activeLevel + 1)));
+    setStars((value) => value + (activeScene?.rewards.stars ?? 3));
+    setCoins((value) => value + (activeScene?.rewards.coins ?? 20));
+    setProgress((value) => Math.min(levelCount, Math.max(value, activeLevel + 1)));
   };
 
   const nextLevel = () => {
     if (activeLevel === null) return;
-    if (activeLevel >= 3) {
+    if (activeLevel >= levelCount - 1) {
       setActiveLevel(null);
       return;
     }
@@ -43,7 +60,7 @@ export function StudentPlay({ onNavigate, onViewReport }: StudentPlayProps) {
         <div>
           <h1 className="text-4xl font-black text-skybrand sm:text-6xl">学生端游戏课件页</h1>
           <p className="mt-3 text-xl font-bold text-ink">
-            一节课就是一场小冒险，孩子边玩边学
+            {activeLesson.title}
           </p>
         </div>
         <Card className="p-4">
@@ -60,18 +77,35 @@ export function StudentPlay({ onNavigate, onViewReport }: StudentPlayProps) {
       </section>
 
       <Card className="p-4">
-        <ProgressBar value={(progress / 5) * 100} label={`已完成 ${progress}/5 关`} color="mint" />
+        <ProgressBar value={(progress / levelCount) * 100} label={`已完成 ${progress}/${levelCount} 关`} color="mint" />
       </Card>
 
       {activeLevel === null ? (
-        <GameMap onSelect={(levelIndex) => setActiveLevel(levelIndex)} />
+        <GameMap
+          title={activeLesson.title}
+          subtitle={`${activeLesson.grade} · ${activeLesson.subject} · ${activeLesson.gameMode}`}
+          levels={mapLevels}
+          completedCount={progress}
+          onSelect={(levelIndex) => setActiveLevel(levelIndex)}
+        />
       ) : (
         <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
           <div>
             {activeLevel === 0 || activeLevel === 1 ? (
-              <DragClassifyGame key={activeLevel} mode="student" onComplete={reward} onNext={nextLevel} />
+              <DragClassifyGame
+                key={activeLevel}
+                mode="student"
+                config={buildDragConfig(activeScene, activeQuestion)}
+                onComplete={reward}
+                onNext={nextLevel}
+              />
             ) : (
-              <QuizRaceGame key={activeLevel} onSuccess={reward} onNext={nextLevel} />
+              <QuizRaceGame
+                key={activeLevel}
+                config={buildQuizConfig(activeQuestion)}
+                onSuccess={reward}
+                onNext={nextLevel}
+              />
             )}
           </div>
           <div className="space-y-5">
@@ -124,4 +158,30 @@ export function StudentPlay({ onNavigate, onViewReport }: StudentPlayProps) {
       </div>
     </div>
   );
+}
+
+function buildDragConfig(scene: Scene | null | undefined, question: Question | undefined) {
+  const options = question?.options.length ? question.options : ["选项 A", "选项 B", "选项 C"];
+  const answer = question?.answer && options.includes(question.answer) ? question.answer : options[0];
+  return {
+    prompt: question?.prompt || scene?.description || "请选择正确答案。",
+    categories: ["正确答案", "其他选项"],
+    items: options,
+    answerMap: options.reduce<Record<string, string>>((acc, option) => {
+      acc[option] = option === answer ? "正确答案" : "其他选项";
+      return acc;
+    }, {})
+  };
+}
+
+function buildQuizConfig(question: Question | undefined) {
+  const options = question?.options.length ? question.options : ["A", "B", "C", "D"];
+  const answer = question?.answer && options.includes(question.answer) ? question.answer : options[0];
+
+  return {
+    prompt: question?.prompt || "请选择正确答案。",
+    options,
+    answer,
+    explanation: question?.explanation
+  };
 }

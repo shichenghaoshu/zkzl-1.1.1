@@ -7,30 +7,34 @@ import {
   createInviteRecord,
   createRedeemRecord,
   type ApiProviderConfig,
-  type MockDatabase
+  type MockDatabase,
+  type TenantRecord
 } from "../data/mockDatabase";
-import { getPlanLabel, maskCredential, type BillingPlan } from "../data/mockCommerce";
-import { testAiProviderConnection } from "../services/lessonAi";
+import { getPlanLabel, maskCredential, planDefinitions, type BillingPlan } from "../data/mockCommerce";
+import { saveAiProviderConfig, testAiProviderConnection } from "../services/lessonAi";
 
 type OpsConsoleProps = {
   database: MockDatabase;
   onUpdateDatabase: (database: MockDatabase) => void;
+  onApplyTenantEntitlements?: (tenant: TenantRecord) => void;
 };
 
-type OpsTab = "api" | "invite" | "redeem" | "database" | "logs";
+type OpsTab = "api" | "users" | "plans" | "invite" | "redeem" | "database" | "logs";
 
-export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
+export function OpsConsole({ database, onUpdateDatabase, onApplyTenantEntitlements }: OpsConsoleProps) {
   const [activeTab, setActiveTab] = useState<OpsTab>("api");
   const [selectedApiId, setSelectedApiId] = useState(database.apiProviders[0]?.id ?? "");
   const selectedApi = database.apiProviders.find((item) => item.id === selectedApiId) ?? database.apiProviders[0];
   const [apiDraft, setApiDraft] = useState<ApiProviderConfig>(selectedApi);
   const [message, setMessage] = useState("Ops 改动会写入浏览器 localStorage 模拟数据库。");
+  const [savingApi, setSavingApi] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
   const [inviteOrg, setInviteOrg] = useState("晨光教培中心");
   const [invitePlan, setInvitePlan] = useState<BillingPlan>("monthly");
   const [redeemTenant, setRedeemTenant] = useState("星河小学");
   const [redeemType, setRedeemType] = useState<"monthly" | "points">("monthly");
   const [redeemAmount, setRedeemAmount] = useState(300);
+  const [tenantDrafts, setTenantDrafts] = useState<Record<string, TenantRecord>>({});
 
   const tableCards = useMemo(
     () => [
@@ -51,20 +55,35 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
     setApiDraft(next);
   };
 
-  const saveApi = () => {
+  const saveApi = async () => {
+    setSavingApi(true);
+    setMessage("正在保存 DeepSeek 配置到本地后端...");
+    const result = await saveAiProviderConfig(apiDraft);
+    if (!result.ok) {
+      setMessage(result.message);
+      setSavingApi(false);
+      return;
+    }
+
+    const savedDraft = {
+      ...apiDraft,
+      apiKey: "",
+      secretStored: true,
+      updatedAt: new Date().toLocaleString("zh-CN", { hour12: false })
+    };
     const nextDb = addAuditLog(
       {
         ...database,
-        apiProviders: database.apiProviders.map((item) =>
-          item.id === apiDraft.id ? { ...apiDraft, updatedAt: new Date().toLocaleString("zh-CN", { hour12: false }) } : item
-        )
+        apiProviders: database.apiProviders.map((item) => (item.id === apiDraft.id ? savedDraft : item))
       },
       "Ops管理员",
-      "保存 AI API 配置",
+      "保存 DeepSeek 配置",
       apiDraft.name
     );
     onUpdateDatabase(nextDb);
-    setMessage(`已保存 AI API：${apiDraft.name}`);
+    setApiDraft(savedDraft);
+    setMessage(result.message);
+    setSavingApi(false);
   };
 
   const testApi = async () => {
@@ -146,13 +165,41 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
     setMessage("模拟数据库已恢复为初始种子数据。");
   };
 
+  const getTenantDraft = (tenant: TenantRecord) => tenantDrafts[tenant.id] ?? tenant;
+
+  const updateTenantDraft = (tenant: TenantRecord, patch: Partial<TenantRecord>) => {
+    setTenantDrafts((current) => ({
+      ...current,
+      [tenant.id]: {
+        ...getTenantDraft(tenant),
+        ...patch
+      }
+    }));
+  };
+
+  const saveTenant = (tenant: TenantRecord) => {
+    const draft = getTenantDraft(tenant);
+    const nextDb = addAuditLog(
+      {
+        ...database,
+        tenants: database.tenants.map((item) => (item.id === draft.id ? draft : item))
+      },
+      "Ops管理员",
+      "调整用户点数和套餐",
+      `${draft.name}：${getPlanLabel(draft.plan)} / ${draft.monthlyQuota} 次 / ${draft.points} 点`
+    );
+    onUpdateDatabase(nextDb);
+    onApplyTenantEntitlements?.(draft);
+    setMessage(`已更新 ${draft.name}：${getPlanLabel(draft.plan)}，月额度 ${draft.monthlyQuota} 次，点数 ${draft.points}。`);
+  };
+
   return (
     <div className="space-y-6">
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-4xl font-black text-skybrand sm:text-6xl">Ops 运营后台</h1>
           <p className="mt-3 text-xl font-bold text-ink">
-            用模拟数据库管理 AI API、邀请码、月付核销码与点券码
+            管理 DeepSeek API、邀请码、月付核销码与点券码
           </p>
         </div>
         <Button variant="coral" onClick={resetDb}>
@@ -163,9 +210,9 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
       <div className="grid gap-4 md:grid-cols-4">
         {[
           ["AI API", database.apiProviders.length, "🤖"],
+          ["用户", database.tenants.length, "👤"],
           ["邀请码", database.inviteCodes.length, "🔐"],
-          ["核销码", database.redeemCodes.length, "🎫"],
-          ["审计日志", database.auditLogs.length, "🧾"]
+          ["核销码", database.redeemCodes.length, "🎫"]
         ].map(([label, value, icon]) => (
           <Card key={label} className="p-4">
             <div className="flex items-center gap-3">
@@ -183,6 +230,8 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
         <div className="flex gap-2 overflow-x-auto">
           {[
             ["api", "AI API管理"],
+            ["users", "用户点数"],
+            ["plans", "套餐计划"],
             ["invite", "邀请码库"],
             ["redeem", "核销码库"],
             ["database", "数据库表"],
@@ -261,12 +310,102 @@ export function OpsConsole({ database, onUpdateDatabase }: OpsConsoleProps) {
               </span>
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={saveApi}>💾 保存到数据库</Button>
+              <Button onClick={saveApi} disabled={savingApi}>
+                {savingApi ? "保存中" : "💾 保存 DeepSeek 配置"}
+              </Button>
               <Button variant="mint" onClick={testApi} disabled={testingApi}>
                 {testingApi ? "测试中" : "🧪 测试连接"}
               </Button>
             </div>
           </Card>
+        </div>
+      ) : null}
+
+      {activeTab === "users" ? (
+        <div className="grid gap-5 xl:grid-cols-2">
+          {database.tenants.map((tenant) => {
+            const draft = getTenantDraft(tenant);
+            return (
+              <Card key={tenant.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black text-ink">{draft.name}</h2>
+                    <p className="mt-1 text-sm font-bold text-slate-500">负责人：{draft.owner}</p>
+                  </div>
+                  <span className="rounded-2xl bg-blue-50 px-3 py-2 text-sm font-black text-skybrand">
+                    {draft.status === "active" ? "启用" : "暂停"}
+                  </span>
+                </div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-black text-slate-600">套餐</span>
+                    <select
+                      className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold outline-none"
+                      value={draft.plan}
+                      onChange={(event) => updateTenantDraft(tenant, { plan: event.target.value as BillingPlan })}
+                    >
+                      {planDefinitions.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-black text-slate-600">状态</span>
+                    <select
+                      className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold outline-none"
+                      value={draft.status}
+                      onChange={(event) => updateTenantDraft(tenant, { status: event.target.value as TenantRecord["status"] })}
+                    >
+                      <option value="active">启用</option>
+                      <option value="paused">暂停</option>
+                    </select>
+                  </label>
+                  <Field
+                    label="月度生成额度"
+                    type="number"
+                    value={String(draft.monthlyQuota)}
+                    onChange={(value) => updateTenantDraft(tenant, { monthlyQuota: Number(value) })}
+                  />
+                  <Field
+                    label="点数余额"
+                    type="number"
+                    value={String(draft.points)}
+                    onChange={(value) => updateTenantDraft(tenant, { points: Number(value) })}
+                  />
+                </div>
+                <Button className="mt-5" fullWidth variant="mint" onClick={() => saveTenant(tenant)}>
+                  保存用户点数和套餐
+                </Button>
+              </Card>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {activeTab === "plans" ? (
+        <div className="grid gap-5 lg:grid-cols-3">
+          {planDefinitions.map((plan) => (
+            <Card key={plan.id} tone={plan.id === "monthly" ? "blue" : plan.id === "points" ? "sun" : "mint"}>
+              <h2 className="text-2xl font-black text-ink">{plan.name}</h2>
+              <p className="mt-2 text-sm font-black text-skybrand">{plan.priceText}</p>
+              <div className="mt-5 space-y-3">
+                <div className="rounded-2xl bg-white/82 p-4">
+                  <p className="text-sm font-black text-slate-500">月度额度</p>
+                  <p className="mt-1 text-3xl font-black text-ink">{plan.monthlyQuota}</p>
+                </div>
+                <div className="rounded-2xl bg-white/82 p-4">
+                  <p className="text-sm font-black text-slate-500">初始点数</p>
+                  <p className="mt-1 text-3xl font-black text-ink">{plan.points}</p>
+                </div>
+                <p className="rounded-2xl bg-white/76 p-3 text-sm font-bold text-slate-600">
+                  {plan.generationCostText}
+                </p>
+                <p className="text-sm font-bold leading-6 text-slate-600">{plan.audience}</p>
+              </div>
+            </Card>
+          ))}
         </div>
       ) : null}
 

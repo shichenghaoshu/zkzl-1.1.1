@@ -17,6 +17,8 @@ export type AiLessonResult =
   | { ok: true; lesson: Lesson; message: string; providerName: string }
   | { ok: false; message: string; providerName?: string };
 
+export const aiSessionStorageKey = "keyou-ai-session-token";
+
 type FetchLike = (input: string, init: RequestInit) => Promise<ResponseLike>;
 
 type ResponseLike = {
@@ -34,18 +36,23 @@ export function getAiProviderStatus(providers: ApiProviderConfig[]): AiProviderS
   if (enabledProviders.length === 0) {
     return {
       ok: false,
-      message: "管理员还没有启用 AI API 通道，请到 Ops 后台启用一个 OpenAI 兼容通道。"
+      message: "管理员还没有启用 DeepSeek API 通道，请到 Ops 后台启用 DeepSeek 配置。"
     };
   }
 
   const provider = enabledProviders.find(
-    (item) => item.baseUrl.trim() && item.model.trim() && item.apiKey.trim() && !isDemoApiKey(item.apiKey)
+    (item) =>
+      item.baseUrl.trim() &&
+      item.model.trim() &&
+      (usesServerStoredDeepSeekSecret(item) ||
+        item.secretStored ||
+        (item.apiKey.trim() && !isDemoApiKey(item.apiKey)))
   );
 
   if (!provider) {
     return {
       ok: false,
-      message: "管理员需要先在 Ops 后台填写真实 API Key、Base URL 和模型，默认 demo key 不会用于真实 AI 生成。"
+      message: "管理员需要先在 Ops 后台填写真实 DeepSeek API Key、Base URL 和模型，默认 demo key 不会用于真实 AI 生成。"
     };
   }
 
@@ -59,6 +66,9 @@ export function getAiProviderStatus(providers: ApiProviderConfig[]): AiProviderS
 export function buildChatCompletionsUrl(baseUrl: string) {
   const normalized = baseUrl.trim().replace(/\/+$/, "");
   if (normalized.endsWith("/chat/completions")) return normalized;
+  if (/^https:\/\/api\.deepseek\.com(?:\/v1)?$/i.test(normalized)) {
+    return "https://api.deepseek.com/chat/completions";
+  }
   if (/\/v\d+$/i.test(normalized)) return `${normalized}/chat/completions`;
   return `${normalized}/v1/chat/completions`;
 }
@@ -74,17 +84,15 @@ export async function generateLessonWithAi(
   const provider = status.provider;
 
   try {
-    const response = await fetchImpl(buildChatCompletionsUrl(provider.baseUrl), {
+    const response = await fetchImpl("/api/ai/generate-lesson", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
+        ...getSessionHeaders()
       },
       body: JSON.stringify({
-        model: provider.model,
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-        messages: buildLessonMessages(input)
+        input,
+        providerId: provider.id
       })
     });
 
@@ -92,19 +100,19 @@ export async function generateLessonWithAi(
       return {
         ok: false,
         providerName: provider.name,
-        message: `AI 生成失败：${await readErrorText(response)}。请检查 Ops 后台的 Base URL、模型、API Key 或浏览器跨域策略。`
+        message: `AI 生成失败：${await readErrorText(response)}。请检查 Ops 后台的 DeepSeek Base URL、模型和 API Key。`
       };
     }
 
     const payload = await response.json();
-    const content = extractAssistantText(payload);
-    const lesson = normalizeLesson(parseJsonContent(content), input);
+    const data = asRecord(payload);
+    const lesson = normalizeLesson(data.lesson, input);
 
     return {
       ok: true,
       lesson,
       providerName: provider.name,
-      message: `已通过 ${provider.name} 生成课件。`
+      message: stringOr(data.message, `已通过 ${provider.name} 生成课件。`)
     };
   } catch (error) {
     return {
@@ -123,26 +131,14 @@ export async function testAiProviderConnection(
   if (!status.ok) return { ok: false, message: status.message };
 
   try {
-    const response = await fetchImpl(buildChatCompletionsUrl(provider.baseUrl), {
+    const response = await fetchImpl("/api/ai/test-provider", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
+        ...getSessionHeaders()
       },
       body: JSON.stringify({
-        model: provider.model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: "只返回 JSON。"
-          },
-          {
-            role: "user",
-            content: "返回 {\"ok\":true,\"service\":\"lesson-ai\"}，用于连接测试。"
-          }
-        ]
+        provider: sanitizeProviderForProxy(provider)
       })
     });
 
@@ -150,7 +146,11 @@ export async function testAiProviderConnection(
       return { ok: false, message: `连接失败：${await readErrorText(response)}` };
     }
 
-    return { ok: true, message: `连接测试通过：${provider.provider} / ${provider.model}` };
+    const payload = asRecord(await response.json());
+    return {
+      ok: payload.ok !== false,
+      message: stringOr(payload.message, `连接测试通过：${provider.provider} / ${provider.model}`)
+    };
   } catch (error) {
     return {
       ok: false,
@@ -159,57 +159,101 @@ export async function testAiProviderConnection(
   }
 }
 
+export async function saveAiProviderConfig(
+  provider: ApiProviderConfig,
+  fetchImpl: FetchLike = fetch
+): Promise<{ ok: boolean; message: string }> {
+  const status = getAiProviderStatus([provider]);
+  if (!status.ok) return { ok: false, message: status.message };
+
+  try {
+    const response = await fetchImpl("/api/ai/config", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getSessionHeaders()
+      },
+      body: JSON.stringify({ provider: sanitizeProviderForProxy(provider) })
+    });
+
+    if (!response.ok) {
+      return { ok: false, message: `保存失败：${await readErrorText(response)}` };
+    }
+
+    const payload = asRecord(await response.json());
+    return {
+      ok: payload.ok !== false,
+      message: stringOr(payload.message, "DeepSeek 配置已保存到本地后端。")
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: `保存失败：${error instanceof Error ? error.message : "未知错误"}`
+    };
+  }
+}
+
+export async function createAiSession(
+  payload:
+    | { mode: "invite"; inviteCode: string; name: string; organizationName: string }
+    | { mode: "admin"; username: string; password: string },
+  fetchImpl: FetchLike = fetch
+): Promise<{ ok: boolean; message: string; token?: string }> {
+  try {
+    const response = await fetchImpl("/api/ai/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = asRecord(await response.json());
+    const token = typeof data.token === "string" ? data.token : undefined;
+    if (response.ok && token) {
+      saveAiSessionToken(token);
+      return { ok: true, token, message: stringOr(data.message, "AI 会话已建立。") };
+    }
+
+    return { ok: false, message: stringOr(data.message, "AI 会话建立失败。") };
+  } catch (error) {
+    return {
+      ok: false,
+      message: `AI 会话建立失败：${error instanceof Error ? error.message : "未知错误"}`
+    };
+  }
+}
+
+export function saveAiSessionToken(token: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(aiSessionStorageKey, token);
+}
+
+export function clearAiSessionToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(aiSessionStorageKey);
+}
+
 function isDemoApiKey(apiKey: string) {
   const normalized = apiKey.trim().toLowerCase();
   return !normalized || normalized.includes("demo") || normalized.includes("placeholder");
 }
 
-function buildLessonMessages(input: LessonGenerationInput) {
-  return [
-    {
-      role: "system",
-      content:
-        "你是面向小学老师的互动游戏课件生成引擎。必须只返回合法 JSON，不要 Markdown，不要解释。"
-    },
-    {
-      role: "user",
-      content: [
-        "请生成一节可编辑的互动游戏课件 JSON。",
-        `课题：${input.topic}`,
-        `学段：${input.grade}`,
-        `学科：${input.subject}`,
-        `玩法：${input.mode}`,
-        `班级人数：${input.studentCount}`,
-        "JSON 字段必须包含：title, grade, subject, gameMode, scenes。",
-        "scenes 为 5 个关卡，每个关卡包含 title, description, questions, rewards。",
-        "questions 每题包含 prompt, options, answer, explanation；options 为 3-4 个短选项。",
-        "rewards 包含 stars 和 coins。内容必须适合中国小学课堂。"
-      ].join("\n")
-    }
-  ];
+function usesServerStoredDeepSeekSecret(provider: ApiProviderConfig) {
+  return (
+    provider.provider.trim().toLowerCase() === "deepseek" &&
+    /^https:\/\/api\.deepseek\.com(?:\/)?$/i.test(provider.baseUrl.trim())
+  );
 }
 
-function extractAssistantText(payload: unknown) {
-  const data = asRecord(payload);
-  const choices = Array.isArray(data.choices) ? data.choices : [];
-  const firstChoice = asRecord(choices[0]);
-  const message = asRecord(firstChoice.message);
-  const chatContent = message.content;
-  if (typeof chatContent === "string" && chatContent.trim()) return chatContent;
+function sanitizeProviderForProxy(provider: ApiProviderConfig): ApiProviderConfig {
+  return isDemoApiKey(provider.apiKey) ? { ...provider, apiKey: "" } : provider;
+}
 
-  if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text;
-
-  const output = Array.isArray(data.output) ? data.output : [];
-  for (const item of output) {
-    const content = asRecord(item).content;
-    if (!Array.isArray(content)) continue;
-    for (const block of content) {
-      const text = asRecord(block).text;
-      if (typeof text === "string" && text.trim()) return text;
-    }
-  }
-
-  throw new Error("AI 返回中没有可解析的文本内容");
+function getSessionHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = window.localStorage.getItem(aiSessionStorageKey);
+  return token ? { "X-Keyou-Session": token } : {};
 }
 
 function parseJsonContent(content: string) {

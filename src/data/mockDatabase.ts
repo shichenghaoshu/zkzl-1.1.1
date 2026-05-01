@@ -14,6 +14,7 @@ export type ApiProviderConfig = {
   baseUrl: string;
   model: string;
   apiKey: string;
+  secretStored?: boolean;
   enabled: boolean;
   dailyLimit: number;
   monthlyCostCap: number;
@@ -61,12 +62,13 @@ export const databaseStorageKey = "keyou-ops-database";
 export const createInitialDatabase = (): MockDatabase => ({
   apiProviders: [
     {
-      id: "api-openai-compatible",
-      name: "默认 AI 课件生成网关",
-      provider: "OpenAI 兼容网关",
-      baseUrl: "https://api.keyou-ai.local/v1",
-      model: "keyou-lesson-pro",
-      apiKey: "sk-demo-keyou-ai-lesson",
+      id: "api-deepseek",
+      name: "DeepSeek 课件生成",
+      provider: "DeepSeek",
+      baseUrl: "https://api.deepseek.com",
+      model: "deepseek-chat",
+      apiKey: "sk-demo-deepseek-key",
+      secretStored: false,
       enabled: true,
       dailyLimit: 2000,
       monthlyCostCap: 3000,
@@ -74,11 +76,12 @@ export const createInitialDatabase = (): MockDatabase => ({
     },
     {
       id: "api-backup",
-      name: "备用多模态生成网关",
-      provider: "多模型备用通道",
-      baseUrl: "https://backup.keyou-ai.local/v1",
-      model: "keyou-lesson-lite",
-      apiKey: "sk-demo-backup-channel",
+      name: "DeepSeek 备用模型",
+      provider: "DeepSeek",
+      baseUrl: "https://api.deepseek.com",
+      model: "deepseek-chat",
+      apiKey: "sk-demo-deepseek-backup",
+      secretStored: false,
       enabled: false,
       dailyLimit: 600,
       monthlyCostCap: 800,
@@ -147,16 +150,45 @@ export const readStoredDatabase = (): MockDatabase => {
     const stored = window.localStorage.getItem(databaseStorageKey);
     if (!stored) return createInitialDatabase();
     const parsed = JSON.parse(stored) as MockDatabase;
+    const initialDatabase = createInitialDatabase();
     return {
-      ...createInitialDatabase(),
+      ...initialDatabase,
       ...parsed,
-      inviteCodes: parsed.inviteCodes?.length ? parsed.inviteCodes : createInitialDatabase().inviteCodes,
-      redeemCodes: parsed.redeemCodes?.length ? parsed.redeemCodes : createInitialDatabase().redeemCodes,
-      apiProviders: parsed.apiProviders?.length ? parsed.apiProviders : createInitialDatabase().apiProviders
+      inviteCodes: parsed.inviteCodes?.length ? parsed.inviteCodes : initialDatabase.inviteCodes,
+      redeemCodes: parsed.redeemCodes?.length ? parsed.redeemCodes : initialDatabase.redeemCodes,
+      apiProviders: normalizeStoredApiProviders(parsed.apiProviders, initialDatabase.apiProviders)
     };
   } catch {
     return createInitialDatabase();
   }
+};
+
+const normalizeStoredApiProviders = (
+  providers: ApiProviderConfig[] | undefined,
+  fallback: ApiProviderConfig[]
+) => {
+  if (!providers?.length) return fallback;
+
+  const hasOldDemoGateway = providers.some(
+    (provider) =>
+      provider.baseUrl.includes("keyou-ai.local") ||
+      provider.model.includes("keyou-lesson") ||
+      provider.id === "api-openai-compatible"
+  );
+
+  return hasOldDemoGateway
+    ? fallback
+    : providers.map((provider) => {
+        const hasRealBrowserKey =
+          provider.apiKey.trim() &&
+          !provider.apiKey.toLowerCase().includes("demo") &&
+          !provider.apiKey.toLowerCase().includes("placeholder") &&
+          !provider.secretStored;
+
+        return hasRealBrowserKey
+          ? { ...provider, apiKey: "", secretStored: true }
+          : provider;
+      });
 };
 
 export const createInviteRecord = (

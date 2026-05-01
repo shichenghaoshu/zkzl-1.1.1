@@ -4,15 +4,19 @@ import { Card } from "../components/Card";
 import { Mascot } from "../components/Mascot";
 import { QRCodeMock } from "../components/QRCodeMock";
 import { mockClass, mockSession } from "../data/mockClassData";
+import { mockLesson, type Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
 
 type ShareLessonProps = {
+  lesson: Lesson | null;
   onNavigate: (route: AppRoute) => void;
 };
 
-export function ShareLesson({ onNavigate }: ShareLessonProps) {
+export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
   const [copied, setCopied] = useState("尚未复制");
   const [published, setPublished] = useState(false);
+  const activeLesson = lesson ?? mockLesson;
+  const shareUrl = `https://keyou.ai/c/${activeLesson.id.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "abc123"}`;
 
   const markCopied = (text: string) => {
     setCopied(text);
@@ -34,7 +38,7 @@ export function ShareLesson({ onNavigate }: ShareLessonProps) {
         <Card className="p-5 sm:p-7">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-black text-ink">分享课堂：分数闯关挑战</h2>
+              <h2 className="text-3xl font-black text-ink">分享课堂：{activeLesson.title}</h2>
               <p className="mt-2 font-bold text-slate-500">
                 老师快速分享，学生点链接即参与，课堂反馈实时进入报告。
               </p>
@@ -49,7 +53,7 @@ export function ShareLesson({ onNavigate }: ShareLessonProps) {
               </div>
               <h3 className="mt-4 text-xl font-black text-ink">复制链接</h3>
               <p className="mt-3 break-all rounded-2xl bg-white px-3 py-3 text-sm font-bold text-skybrand">
-                https://keyou.ai/c/abc123
+                {shareUrl}
               </p>
               <Button className="mt-4" variant="secondary" onClick={() => markCopied("链接已复制")}>
                 复制
@@ -84,7 +88,7 @@ export function ShareLesson({ onNavigate }: ShareLessonProps) {
             <label>
               <span className="mb-2 block text-sm font-black text-slate-600">发布到班级</span>
               <select className="min-h-14 w-full rounded-2xl border border-blue-100 bg-white px-4 text-lg font-black text-ink outline-none">
-                <option>{mockClass.name}</option>
+                <option>{mockClass.name} · {activeLesson.scenes.length} 关</option>
               </select>
             </label>
             <Button
@@ -114,7 +118,7 @@ export function ShareLesson({ onNavigate }: ShareLessonProps) {
                 <p className="text-center text-sm font-black text-slate-600">三年级2班家长群</p>
                 <div className="mt-4 rounded-3xl bg-white p-4 shadow-md">
                   <div className="text-sm font-bold text-slate-500">课游AI</div>
-                  <h3 className="mt-2 text-2xl font-black text-ink">分数闯关挑战</h3>
+                  <h3 className="mt-2 text-2xl font-black text-ink">{activeLesson.title}</h3>
                   <p className="mt-1 font-bold text-slate-500">点击进入课堂互动</p>
                   <div className="mt-4 flex h-36 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-300 to-amber-200 text-6xl">
                     🏆⭐🧸

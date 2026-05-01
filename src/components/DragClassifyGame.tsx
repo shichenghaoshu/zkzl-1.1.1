@@ -6,6 +6,7 @@ type DragMode = "editor" | "student";
 
 type DragClassifyGameProps = {
   mode?: DragMode;
+  config?: DragConfig;
   onComplete?: () => void;
   onNext?: () => void;
 };
@@ -42,8 +43,8 @@ const configs: Record<DragMode, DragConfig> = {
   }
 };
 
-export function DragClassifyGame({ mode = "editor", onComplete, onNext }: DragClassifyGameProps) {
-  const config = configs[mode];
+export function DragClassifyGame({ mode = "editor", config: customConfig, onComplete, onNext }: DragClassifyGameProps) {
+  const config = customConfig ?? configs[mode];
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [placements, setPlacements] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("先点一个分数，再点分类框，就像拖拽一样。");
@@ -93,6 +94,11 @@ export function DragClassifyGame({ mode = "editor", onComplete, onNext }: DragCl
     setCompleted(false);
     setFeedback("先点一个分数，再点分类框，就像拖拽一样。");
   };
+
+  useEffect(() => {
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.prompt, config.items.join("|"), config.categories.join("|")]);
 
   return (
     <div className="space-y-4">

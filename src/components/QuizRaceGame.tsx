@@ -3,6 +3,12 @@ import { Button } from "./Button";
 import { Card } from "./Card";
 
 type QuizRaceGameProps = {
+  config?: {
+    prompt: string;
+    options: string[];
+    answer: string;
+    explanation?: string;
+  };
   onSuccess?: () => void;
   onNext?: () => void;
 };
@@ -10,20 +16,24 @@ type QuizRaceGameProps = {
 const options = ["A. 1/2", "B. 2/3", "C. 3/4", "D. 1/3"];
 const correctAnswer = "C. 3/4";
 
-export function QuizRaceGame({ onSuccess, onNext }: QuizRaceGameProps) {
+export function QuizRaceGame({ config, onSuccess, onNext }: QuizRaceGameProps) {
+  const activeOptions = config?.options.length ? config.options : options;
+  const activeAnswer = config?.answer || correctAnswer;
+  const activePrompt = config?.prompt || "下面哪个分数最大？";
+  const activeExplanation = config?.explanation || "3/4 更接近 1，比 2/3、1/2、1/3 都大。";
   const [selected, setSelected] = useState<string | null>(null);
   const [hasSucceeded, setHasSucceeded] = useState(false);
 
   const choose = (option: string) => {
     setSelected(option);
-    if (option === correctAnswer && !hasSucceeded) {
+    if (option === activeAnswer && !hasSucceeded) {
       setHasSucceeded(true);
       onSuccess?.();
     }
   };
 
-  const isWrong = selected !== null && selected !== correctAnswer;
-  const isCorrect = selected === correctAnswer;
+  const isWrong = selected !== null && selected !== activeAnswer;
+  const isCorrect = selected === activeAnswer;
 
   return (
     <Card className="overflow-hidden p-0">
@@ -31,7 +41,7 @@ export function QuizRaceGame({ onSuccess, onNext }: QuizRaceGameProps) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-bold text-white/80">竞速答题 · 第 3 / 5 题</p>
-            <h3 className="mt-1 text-3xl font-black">下面哪个分数最大？</h3>
+            <h3 className="mt-1 text-3xl font-black">{activePrompt}</h3>
           </div>
           <div className="rounded-2xl bg-white/22 px-4 py-2 text-xl font-black">⏱️ 00:18</div>
         </div>
@@ -41,9 +51,9 @@ export function QuizRaceGame({ onSuccess, onNext }: QuizRaceGameProps) {
       </div>
 
       <div className="grid gap-3 p-5 sm:grid-cols-2">
-        {options.map((option) => {
+        {activeOptions.map((option) => {
           const active = selected === option;
-          const correct = option === correctAnswer && isCorrect;
+          const correct = option === activeAnswer && isCorrect;
           return (
             <button
               key={option}
@@ -85,7 +95,7 @@ export function QuizRaceGame({ onSuccess, onNext }: QuizRaceGameProps) {
           <Card tone="coral" className="p-4">
             <p className="text-xl font-black text-coralbrand">再试一次</p>
             <p className="mt-1 font-bold text-slate-600">
-              解析：3/4 更接近 1，比 2/3、1/2、1/3 都大。
+              解析：{activeExplanation}
             </p>
           </Card>
         ) : null}

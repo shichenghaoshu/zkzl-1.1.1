@@ -3,13 +3,16 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Mascot } from "../components/Mascot";
 import {
+  createAdminUserFromPassword,
   createUserFromInvite,
   getPlanLabel,
+  planDefinitions,
   type InviteCode,
   type AuthUser,
   type UsageAccount
 } from "../data/mockCommerce";
 import type { AppRoute } from "../data/routes";
+import { createAiSession } from "../services/lessonAi";
 
 type AuthPageProps = {
   onLogin: (user: AuthUser, usage: UsageAccount, nextRoute: AppRoute) => void;
@@ -33,12 +36,20 @@ export function AuthPage({
   const [name, setName] = useState("王老师");
   const [organizationName, setOrganizationName] = useState("三年级数学教研组");
   const [inviteCode, setInviteCode] = useState("KEYOU-DEMO-2026");
+  const [adminName, setAdminName] = useState("admin");
+  const [adminPassword, setAdminPassword] = useState("keyou2026");
   const [message, setMessage] = useState("输入有效邀请码即可注册并登录 Demo 账户。");
 
-  const submit = () => {
+  const submit = async () => {
     const result = createUserFromInvite(inviteCode, name, organizationName, inviteCodes);
     if (!result) {
       setMessage("邀请码校验失败：请使用下方 Demo 邀请码，或到后台生成新邀请码。");
+      return;
+    }
+
+    const session = await createAiSession({ mode: "invite", inviteCode, name, organizationName });
+    if (!session.ok) {
+      setMessage(session.message);
       return;
     }
 
@@ -46,12 +57,29 @@ export function AuthPage({
     onLogin(result.user, result.usage, redirectRoute);
   };
 
+  const submitAdmin = async () => {
+    const result = createAdminUserFromPassword(adminName, adminPassword);
+    if (!result) {
+      setMessage("管理员账号或密码错误。");
+      return;
+    }
+
+    const session = await createAiSession({ mode: "admin", username: adminName, password: adminPassword });
+    if (!session.ok) {
+      setMessage(session.message);
+      return;
+    }
+
+    setMessage("管理员登录成功，正在进入 Ops 后台。");
+    onLogin(result.user, result.usage, "ops");
+  };
+
   return (
     <div className="space-y-6">
       <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-4xl font-black text-skybrand sm:text-6xl">邀请码注册登录</h1>
-          <p className="mt-3 text-xl font-bold text-ink">
+          <p className="mt-3 max-w-3xl text-lg font-bold leading-8 text-ink sm:text-xl">
             老师端需要登录验证，学生端仍然点链接即参与
           </p>
         </div>
@@ -60,7 +88,7 @@ export function AuthPage({
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.82fr]">
         <Card className="p-6 sm:p-8">
-          <h2 className="text-3xl font-black text-ink">注册 / 登录</h2>
+          <h2 className="text-3xl font-black text-ink">老师注册 / 登录</h2>
           <p className="mt-2 font-bold leading-7 text-slate-600">
             使用机构发放的邀请码开通账号。月付用户可通过核销码开通月度额度；次付用户可通过点券核销码充值。
           </p>
@@ -107,6 +135,52 @@ export function AuthPage({
         </Card>
 
         <div className="space-y-5">
+          <Card tone="blue">
+            <h3 className="text-2xl font-black text-ink">管理员账号</h3>
+            <div className="mt-4 grid gap-3">
+              <label>
+                <span className="mb-2 block text-sm font-black text-slate-600">账号</span>
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+                  value={adminName}
+                  onChange={(event) => setAdminName(event.target.value)}
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-black text-slate-600">密码</span>
+                <input
+                  className="min-h-12 w-full rounded-2xl border border-blue-100 bg-white px-3 font-bold text-ink outline-none focus:border-skybrand focus:ring-4 focus:ring-blue-100"
+                  type="password"
+                  value={adminPassword}
+                  onChange={(event) => setAdminPassword(event.target.value)}
+                />
+              </label>
+              <Button fullWidth variant="secondary" onClick={submitAdmin}>
+                🗄️ 管理员登录
+              </Button>
+            </div>
+          </Card>
+
+          <Card tone="sun">
+            <h3 className="text-2xl font-black text-ink">套餐计划</h3>
+            <div className="mt-4 space-y-3">
+              {planDefinitions.map((plan) => (
+                <div key={plan.id} className="rounded-3xl bg-white/82 p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-black text-ink">{plan.name}</p>
+                    <span className="rounded-2xl bg-yellow-50 px-3 py-1 text-xs font-black text-orange-500">
+                      {plan.priceText}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm font-bold text-slate-600">
+                    {plan.monthlyQuota} 次额度 · {plan.points} 点 · {plan.generationCostText}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-slate-500">{plan.audience}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           <Card tone="mint">
             <h3 className="text-2xl font-black text-skybrand">可用 Demo 邀请码</h3>
             <div className="mt-4 space-y-3">

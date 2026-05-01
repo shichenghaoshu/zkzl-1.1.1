@@ -1,5 +1,15 @@
 export type BillingPlan = "trial" | "monthly" | "points";
 
+export type PlanDefinition = {
+  id: BillingPlan;
+  name: string;
+  priceText: string;
+  monthlyQuota: number;
+  points: number;
+  generationCostText: string;
+  audience: string;
+};
+
 export type InviteCode = {
   code: string;
   name: string;
@@ -18,6 +28,13 @@ export type AuthUser = {
   createdAt: string;
 };
 
+export type AdminCredential = {
+  username: string;
+  password: string;
+  name: string;
+  organizationName: string;
+};
+
 export type UsageAccount = {
   plan: BillingPlan;
   monthlyQuota: number;
@@ -26,6 +43,45 @@ export type UsageAccount = {
   expiresAt?: string;
   lastRedeemedCode?: string;
 };
+
+export const planDefinitions: PlanDefinition[] = [
+  {
+    id: "trial",
+    name: "试用套餐",
+    priceText: "免费体验",
+    monthlyQuota: 20,
+    points: 120,
+    generationCostText: "每次生成扣 1 次月额度",
+    audience: "单个老师体验完整生成与编辑链路"
+  },
+  {
+    id: "monthly",
+    name: "机构月付",
+    priceText: "按月订阅",
+    monthlyQuota: 300,
+    points: 0,
+    generationCostText: "每次生成扣 1 次月额度",
+    audience: "学校、教培机构、教研组"
+  },
+  {
+    id: "points",
+    name: "点数套餐",
+    priceText: "按量充值",
+    monthlyQuota: 0,
+    points: 1000,
+    generationCostText: "每次生成扣 80 点",
+    audience: "低频使用或临时项目制备课"
+  }
+];
+
+export const adminCredentials: AdminCredential[] = [
+  {
+    username: "admin",
+    password: "keyou2026",
+    name: "管理员",
+    organizationName: "课游AI 运营后台"
+  }
+];
 
 export type RedeemCode = {
   code: string;
@@ -119,7 +175,7 @@ export const createUserFromInvite = (
     id: `user-${invite.code.toLowerCase().replace(/-/g, "")}`,
     name: name.trim() || "王老师",
     organizationName: organizationName.trim() || "课游AI 体验学校",
-    role: invite.plan === "trial" ? "teacher" : "admin",
+    role: "teacher",
     inviteCode: invite.code,
     createdAt: new Date().toISOString()
   };
@@ -133,6 +189,38 @@ export const createUserFromInvite = (
   };
 
   return { user, usage };
+};
+
+export const createAdminUserFromPassword = (
+  username: string,
+  password: string,
+  credentials: AdminCredential[] = adminCredentials
+): { user: AuthUser; usage: UsageAccount } | null => {
+  const credential = credentials.find(
+    (item) =>
+      item.username.toLowerCase() === username.trim().toLowerCase() &&
+      item.password === password
+  );
+
+  if (!credential) return null;
+
+  return {
+    user: {
+      id: `admin-${credential.username.toLowerCase()}`,
+      name: credential.name,
+      organizationName: credential.organizationName,
+      role: "admin",
+      inviteCode: `ADMIN-${credential.username.toUpperCase()}`,
+      createdAt: new Date().toISOString()
+    },
+    usage: {
+      plan: "monthly",
+      monthlyQuota: 300,
+      monthlyUsed: 0,
+      points: 1000,
+      expiresAt: addDays(365)
+    }
+  };
 };
 
 export const generateInviteCode = (organizationName: string, plan: BillingPlan) => {

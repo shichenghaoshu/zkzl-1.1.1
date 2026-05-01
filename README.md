@@ -2,7 +2,7 @@
 
 「课游AI」是一个面向小学老师、教培机构和教育产品评审场景的 AI 互动游戏课件平台 Demo。它展示了从老师输入知识点，到调用管理员配置的 AI 通道生成游戏课件，再到老师编辑、快速分享、学生免下载参与、游戏化闯关、班级数据报告，以及后台 API 和码库运营管理的完整产品闭环。
 
-本项目是纯前端 Demo。当前版本不接真实后端、不接真实数据库、不接真实支付；AI 生成会使用 Ops 管理员后台配置的 OpenAI 兼容接口。登录、邀请码、核销码、用量、API 配置、数据库表和审计日志通过 mock 数据与浏览器 `localStorage` 模拟，因此真实 API Key 只适合本机演示。
+本项目是前端 Demo 加本地 DeepSeek 代理。当前版本不接真实数据库、不接真实支付；AI 生成会使用 Ops 管理员后台配置的 DeepSeek API，由同源 `/api/ai/*` 本地代理请求 DeepSeek。登录、邀请码、核销码、用量、数据库表和审计日志通过 mock 数据与浏览器 `localStorage` 模拟。
 
 ## 核心价值
 
@@ -23,10 +23,10 @@
 - Vite
 - Tailwind CSS
 - 本地状态与 `localStorage` 模拟数据库
-- OpenAI 兼容 Chat Completions 请求
+- DeepSeek Chat Completions 生成代理
 - CSS / emoji / SVG-like CSS 图形实现可爱教育科技视觉
 
-未使用真实后端服务，方便静态部署、产品演示和快速迭代。生产环境应把 AI Key 放在后端或服务端函数中。
+本地开发和预览时，Vite 会挂载 `/api/ai/*` 代理；生产环境应把这部分迁移到后端或服务端函数中保存密钥。
 
 ## 快速开始
 
@@ -58,6 +58,18 @@ http://localhost:5173/
 ```bash
 npm run dev -- --port 5173
 ```
+
+### 配置 DeepSeek
+
+1. 打开 `/login`，使用管理员账号登录：账号 `admin`，密码 `keyou2026`。
+2. 进入 `/ops` 的「AI API管理」。
+3. 将 Base URL 设为 `https://api.deepseek.com`，模型可用 `deepseek-chat`。
+4. 填入真实 DeepSeek API Key，点击「保存 DeepSeek 配置」。
+5. 点击「测试连接」，通过后进入 `/generate` 生成课件。
+
+配置会写入本机 `.keyou-ai-provider.local.json`，该文件已加入 `.gitignore`，不会提交到仓库。也可以用环境变量 `DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL` 启动服务。
+
+老师端和生成页不展示 API Key、Base URL 或模型设置；只有 Ops 管理员界面可以保存和测试 DeepSeek。
 
 ### 类型检查
 
@@ -127,6 +139,12 @@ npm run preview
 | `MONTH-TEACHER-2026` | 月付用户 | 300 次月度生成额度 |
 | `POINTS-ORG-2026` | 次付点券 | 1000 点券 |
 
+### 内置管理员账号
+
+| 账号 | 密码 | 权限 |
+| --- | --- | --- |
+| `admin` | `keyou2026` | 进入 `/ops` 管理 DeepSeek、用户点数、套餐、邀请码、核销码 |
+
 ### 生成课件扣减规则
 
 | 账户类型 | 生成一次课件扣减 |
@@ -149,6 +167,14 @@ npm run preview
 | `POINT-300-DEMO` | 体验点券码 | 增加 300 点券 |
 
 核销成功后会更新当前账户权益，并写入模拟数据库的 `usage_logs` 和 `audit_logs`。
+
+### 套餐计划
+
+| 套餐 | 初始月额度 | 初始点数 | 扣减规则 |
+| --- | ---: | ---: | --- |
+| 试用套餐 | 20 | 120 | 生成一次扣 1 次月额度 |
+| 机构月付 | 300 | 0 | 生成一次扣 1 次月额度 |
+| 点数套餐 | 0 | 1000 | 生成一次扣 80 点 |
 
 ## 功能模块说明
 
@@ -176,8 +202,9 @@ npm run preview
 - 选择玩法：闯关地图、竞速答题、拖拽分类、翻卡记忆、知识配对、转盘挑战。
 - 设置班级人数。
 - 查看 AI 生成结果预览。
-- 点击「一键生成游戏课」后请求管理员配置的 AI 通道，并显示生成动画。
+- 点击「一键生成游戏课」后请求本地 DeepSeek 代理，并显示生成动画。
 - AI 成功返回结构化课件后，再根据当前账户权益扣减月额度或点券。
+- DeepSeek 返回的课件会写入当前课件状态，进入编辑器后可继续修改。
 
 生成阶段：
 
@@ -196,7 +223,8 @@ npm run preview
 - 中间：实时预览画布。
 - 右栏：内容设置。
 - 支持切换关卡。
-- 支持题目、选项数量、时间限制、奖励星星、难度设置。
+- 支持编辑 AI 生成的关卡标题、关卡描述、题目、选项、正确答案、答案解释、奖励星星、时间限制、难度设置。
+- 生成课件会保存到 `localStorage`，编辑后的内容会继续作为当前课件使用。
 - 内置拖拽分类题，移动端用「先点分数，再点分类框」模拟拖拽。
 - 正确时显示星星奖励。
 - 错误时提示「再想一想哦」。
@@ -208,6 +236,7 @@ npm run preview
 功能：
 
 - 展示课堂分享标题：分数闯关挑战。
+- 如果已生成或编辑课件，分享页会使用当前课件标题和关卡数量。
 - 提供三种分享方式：
   - 复制链接
   - 下载二维码
@@ -234,15 +263,9 @@ npm run preview
 
 功能：
 
-- 展示「分数王国大冒险」闯关地图。
+- 展示当前课件的闯关地图。
 - 展示学生状态：头像、昵称、星星、金币。
-- 展示进度条：已完成 4/5 关。
-- 关卡包括：
-  - 初识分数
-  - 分数的意义
-  - 分数的比较
-  - 分数的加减法
-  - 分数应用挑战
+- 展示进度条和当前课件关卡。
 - 内置两个互动游戏组件：
   - 拖拽分类游戏
   - 竞速答题游戏
@@ -293,7 +316,7 @@ npm run preview
 
 功能：
 
-- AI API 管理：
+- DeepSeek API 管理：
   - 通道名称
   - 供应商
   - Base URL
@@ -301,8 +324,16 @@ npm run preview
   - API Key
   - 每日限额
   - 启用 / 停用状态
-  - 保存到模拟数据库
-  - 测试连接
+  - 保存到本地 DeepSeek 代理
+  - 通过代理测试连接
+- 用户点数：
+  - 调整租户套餐
+  - 调整月度生成额度
+  - 调整点数余额
+  - 启用 / 暂停租户
+- 套餐计划：
+  - 查看试用、机构月付、点数套餐
+  - 查看每种套餐的额度和扣减规则
 - 邀请码库：
   - 生成邀请码
   - 写入 `invite_codes`
@@ -332,6 +363,8 @@ npm run preview
 | `keyou-account-store` | 按邀请码持久化的账户权益，避免重复登录重置额度 |
 | `keyou-redeemed-codes` | 当前 Demo 会话已核销码 |
 | `keyou-ops-database` | Ops 模拟数据库 |
+| `keyou-generated-lesson` | 当前生成并编辑过的课件 |
+| `keyou-ai-session-token` | 本地 AI 代理会话 token |
 
 ### 表结构
 
@@ -347,6 +380,7 @@ AI API 通道配置表。
 - `baseUrl`
 - `model`
 - `apiKey`
+- `secretStored`
 - `enabled`
 - `dailyLimit`
 - `monthlyCostCap`
@@ -465,6 +499,12 @@ AI API 通道配置表。
 │   │   └── TeacherDashboard.tsx
 │   └── styles
 │       └── globals.css
+├── server
+│   ├── deepseekLessonApi.ts
+│   ├── deepseekLessonApi.test.ts
+│   └── lessonPrompt.ts
+├── prompts
+│   └── deepseek-lesson-generation.skill.md
 └── README.md
 ```
 
@@ -488,12 +528,13 @@ AI API 通道配置表。
 负责：
 
 - 账户套餐类型。
+- 套餐计划定义。
 - 邀请码数据结构。
+- 管理员账号数据结构。
 - 用户数据结构。
 - 用量账户数据结构。
 - 核销码数据结构。
 - 邀请码登录逻辑。
-- 生成 API 凭证。
 - 月额度和点券扣减。
 - 核销码核销逻辑。
 
@@ -513,10 +554,29 @@ AI API 通道配置表。
 负责：
 
 - 平台侧管理 AI API。
+- 平台侧管理用户点数和套餐。
 - 平台侧生成邀请码。
 - 平台侧生成核销码。
 - 展示模拟数据库表。
 - 展示审计和使用日志。
+
+### server/deepseekLessonApi.ts
+
+负责：
+
+- 提供本地 `/api/ai/*` Vite 代理。
+- 建立老师和管理员 AI 会话。
+- 只允许管理员保存和测试 DeepSeek 配置。
+- 从 `.keyou-ai-provider.local.json` 或环境变量读取 DeepSeek Key。
+- 调用 DeepSeek Chat Completions 并归一化为可编辑课件 JSON。
+
+### server/lessonPrompt.ts 与 prompts/deepseek-lesson-generation.skill.md
+
+负责：
+
+- 维护每次生成使用的 skill 名称、版本和输出合同。
+- 维护完整 prompt 结构。
+- 约束 DeepSeek 返回 5 个可编辑关卡、题目、选项、答案、讲解和奖励。
 
 ### BackendConsole.tsx
 
@@ -543,13 +603,13 @@ AI API 通道配置表。
 
 当前项目是产品 Demo，不是生产系统。
 
-- 没有真实后端。
+- 没有生产级后端和真实数据库；当前只有本地 DeepSeek 代理。
 - 没有真实数据库。
 - 没有真实支付。
 - 没有真实短信、邮箱或微信分享。
 - 没有真实账号密码系统。
-- `localStorage` 中的数据只适合本机演示。
-- AI API 由浏览器直接请求管理员配置的 OpenAI 兼容接口，生产环境需要后端代理来保护密钥。
+- `localStorage` 中的数据只适合同一浏览器演示；跨设备真实同步需要后端数据库。
+- DeepSeek API Key 保存在本机代理配置文件或环境变量中；生产环境需要后端权限、租户隔离和密钥管理。
 
 ## 接入真实后端的建议
 
@@ -660,6 +720,12 @@ POINTS-ORG-2026
 
 学生端 `/student` 和 `/play` 不需要登录。
 
+Ops 管理员后台需要管理员账号：
+
+```text
+admin / keyou2026
+```
+
 ### 如何恢复初始数据？
 
 进入 `/ops`，点击「重置模拟数据库」。
@@ -684,22 +750,32 @@ keyou-ops-database
 
 ### 为什么默认 AI 不能生成？
 
-默认种子数据使用 `sk-demo-...` 占位密钥，不会伪装成真实生成。请使用管理员账号进入 `/ops`，在 AI API 管理中填入真实 Base URL、模型和 API Key，测试连接通过后再到 `/generate` 生成课件。
+默认种子数据使用 `sk-demo-...` 占位密钥，不会伪装成真实生成。请使用管理员账号进入 `/ops`，在 AI API 管理中填入真实 DeepSeek Base URL、模型和 API Key，保存并测试连接通过后再到 `/generate` 生成课件。
 
 ### 可以部署到静态网站吗？
 
-可以。因为当前没有真实后端依赖，执行 `npm run build` 后，将 `dist` 部署到任意静态托管平台即可。但刷新深层路由时，需要平台配置 SPA fallback 到 `index.html`。
+纯静态部署只能展示界面，不能保护 DeepSeek Key，也不能调用 `/api/ai/*`。如果要线上真实生成，需要把 `server/deepseekLessonApi.ts` 的逻辑放到 Node 后端、Serverless Function 或边缘函数中，同时配置 SPA fallback 到 `index.html`。
 
 ## 验证记录
 
 当前版本已执行：
 
 ```bash
+npm test
 npm run typecheck
 npm run build
 ```
 
-构建通过。浏览器中已验证核心页面可加载，包括：
+验证结果：
+
+- 单元测试通过：2 个测试文件，11 个测试用例。
+- TypeScript 类型检查通过。
+- Vite 生产构建通过。
+- 本地 DeepSeek 代理已用 `deepseek-chat` 完成真实连接测试。
+- 本地 DeepSeek 代理已生成真实课件 JSON：返回 5 个关卡，可进入编辑器继续编辑。
+- Chrome headless 已用桌面和移动视口截图检查 `/login` 与 `/play`，页面可加载且移动端标题不遮挡主体内容。
+
+浏览器中已验证核心页面可加载，包括：
 
 - `/teacher-dashboard`
 - `/generate`
