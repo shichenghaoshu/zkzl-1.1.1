@@ -34,8 +34,40 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Package build output
-        run: tar -C dist -czf "$RUNNER_TEMP/savegpa-dist.tgz" .
+      - name: Package production app
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/savegpa-app.tgz" \
+            --exclude='.env*' \
+            --exclude='.keyou-ai-provider.local.json' \
+            dist server prompts package.json package-lock.json README.md
+
+      - name: Prepare server env file
+        shell: bash
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL: ${{ secrets.DEEPSEEK_MODEL }}
+          DEEPSEEK_BASE_URL: ${{ secrets.DEEPSEEK_BASE_URL }}
+          KEYOU_ADMIN_USERNAME: ${{ secrets.KEYOU_ADMIN_USERNAME }}
+          KEYOU_ADMIN_PASSWORD: ${{ secrets.KEYOU_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          for name in DEEPSEEK_API_KEY KEYOU_ADMIN_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing GitHub secret: $name" >&2
+              exit 1
+            fi
+          done
+
+          {
+            printf 'DEEPSEEK_API_KEY=%s\n' "$DEEPSEEK_API_KEY"
+            printf 'DEEPSEEK_MODEL=%s\n' "${DEEPSEEK_MODEL:-deepseek-chat}"
+            printf 'DEEPSEEK_BASE_URL=%s\n' "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+            printf 'KEYOU_ADMIN_USERNAME=%s\n' "${KEYOU_ADMIN_USERNAME:-admin}"
+            printf 'KEYOU_ADMIN_PASSWORD=%s\n' "$KEYOU_ADMIN_PASSWORD"
+          } > "$RUNNER_TEMP/savegpa-env.production.local"
+          chmod 600 "$RUNNER_TEMP/savegpa-env.production.local"
 
       - name: Deploy to server
         shell: bash
@@ -68,7 +100,8 @@ jobs:
             -o UserKnownHostsFile="$KNOWN_HOSTS"
           )
 
-          scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-dist.tgz" "$SSH_USER@$SSH_HOST:/tmp/savegpa-dist-$RELEASE_ID.tgz"
+          scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-app.tgz" "$SSH_USER@$SSH_HOST:/tmp/savegpa-app-$RELEASE_ID.tgz"
+          scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-env.production.local" "$SSH_USER@$SSH_HOST:/tmp/savegpa-env-$RELEASE_ID"
 
           ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" "bash -s -- '$RELEASE_ID' '$GITHUB_SHA'" <<'REMOTE'
           set -euo pipefail
@@ -76,23 +109,169 @@ jobs:
           DEPLOY_ID="$1"
           COMMIT_SHA="$2"
           SITE_DIR="/var/www/savegpa"
-          ARCHIVE="/tmp/savegpa-dist-$DEPLOY_ID.tgz"
+          SERVICE_NAME="savegpa"
+          APP_ARCHIVE="/tmp/savegpa-app-$DEPLOY_ID.tgz"
+          ENV_UPLOAD="/tmp/savegpa-env-$DEPLOY_ID"
           RELEASE="$SITE_DIR/releases/$DEPLOY_ID"
+          SHARED="$SITE_DIR/shared"
 
-          test -s "$ARCHIVE"
-          mkdir -p "$RELEASE"
-          tar -C "$RELEASE" -xzf "$ARCHIVE"
-          rm -f "$ARCHIVE"
+          NODE_BIN="$(command -v node || true)"
+          if [ -z "$NODE_BIN" ]; then
+            echo "Node.js is required on the server to run /api/ai/*." >&2
+            exit 1
+          fi
+
+          test -s "$APP_ARCHIVE"
+          test -s "$ENV_UPLOAD"
+          mkdir -p "$RELEASE" "$SHARED"
+          tar -C "$RELEASE" -xzf "$APP_ARCHIVE"
+          rm -f "$APP_ARCHIVE"
+
+          install -m 600 "$ENV_UPLOAD" "$SHARED/.env.production.local"
+          rm -f "$ENV_UPLOAD"
+          ln -sfn "$SHARED/.env.production.local" "$RELEASE/.env.production.local"
+
+          if command -v npm >/dev/null 2>&1; then
+            (cd "$RELEASE" && npm ci --omit=dev --ignore-scripts)
+          fi
 
           find "$RELEASE" -type d -exec chmod 755 {} +
           find "$RELEASE" -type f -exec chmod 644 {} +
+          chmod 600 "$SHARED/.env.production.local"
 
           ln -sfnT "releases/$DEPLOY_ID" "$SITE_DIR/current"
           printf '%s\n' "$COMMIT_SHA" > "$SITE_DIR/.deployed_commit"
 
+          DEPLOY_USER="$(id -un)"
+          sudo tee "/etc/systemd/system/$SERVICE_NAME.service" >/dev/null <<SERVICE
+          [Unit]
+          Description=savegpa Node production server
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=$DEPLOY_USER
+          WorkingDirectory=$SITE_DIR/current
+          Environment=NODE_ENV=production
+          Environment=PORT=4173
+          Environment=HOST=127.0.0.1
+          ExecStart=$NODE_BIN server/productionServer.mjs
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          sudo /usr/bin/systemctl daemon-reload
+          sudo /usr/bin/systemctl enable "$SERVICE_NAME"
+          sudo /usr/bin/systemctl restart "$SERVICE_NAME"
+          sleep 2
+          sudo /usr/bin/systemctl is-active --quiet "$SERVICE_NAME"
+          curl -fsS -X POST \
+            -H 'Content-Type: application/json' \
+            --data '{"role":"admin"}' \
+            http://127.0.0.1:4173/api/ai/session >/dev/null
+
+          BACKUP_SUFFIX="bak-$DEPLOY_ID"
+          sudo /usr/bin/python3 - "$DEPLOY_ID" <<'PY'
+          import pathlib
+          import re
+          import shutil
+          import sys
+
+          deploy_id = sys.argv[1]
+          backup_suffix = f"bak-{deploy_id}"
+          roots = [
+              pathlib.Path("/etc/nginx/nginx.conf"),
+              pathlib.Path("/etc/nginx/conf.d"),
+              pathlib.Path("/etc/nginx/sites-enabled"),
+              pathlib.Path("/etc/nginx/sites-available"),
+          ]
+          files = []
+          for root in roots:
+              if root.is_file():
+                  files.append(root)
+              elif root.is_dir():
+                  files.extend(root.rglob("*.conf"))
+
+          snippet = """
+            # savegpa-node-api-proxy
+            location ^~ /api/ai/ {
+              proxy_pass http://127.0.0.1:4173;
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_read_timeout 120s;
+            }
+          """
+
+          def server_blocks(text):
+              for match in re.finditer(r"\\bserver\\s*\\{", text):
+                  brace = text.find("{", match.start())
+                  depth = 0
+                  for index in range(brace, len(text)):
+                      char = text[index]
+                      if char == "{":
+                          depth += 1
+                      elif char == "}":
+                          depth -= 1
+                          if depth == 0:
+                              yield match.start(), index + 1
+                              break
+
+          patched_any = False
+          for path in files:
+              try:
+                  original = path.read_text()
+              except UnicodeDecodeError:
+                  continue
+              if "savegpa.online" not in original and "/var/www/savegpa" not in original:
+                  continue
+
+              replacements = []
+              for start, end in server_blocks(original):
+                  block = original[start:end]
+                  targets_site = "savegpa.online" in block or "/var/www/savegpa" in block
+                  already_patched = "savegpa-node-api-proxy" in block or "location ^~ /api/ai/" in block
+                  if targets_site and not already_patched:
+                      replacements.append((end - 1, snippet))
+
+              if not replacements:
+                  continue
+
+              backup = path.with_name(path.name + f".{backup_suffix}")
+              shutil.copy2(path, backup)
+              updated = original
+              for insert_at, insert_text in reversed(replacements):
+                  updated = updated[:insert_at] + insert_text + updated[insert_at:]
+              path.write_text(updated)
+              patched_any = True
+              print(f"patched nginx config: {path}")
+
+          if not patched_any:
+              print("nginx config already patched or no matching server block found")
+          PY
+
+          if ! sudo /usr/sbin/nginx -t; then
+            echo "nginx config test failed, restoring backups" >&2
+            while IFS= read -r -d '' backup; do
+              original="${backup%.$BACKUP_SUFFIX}"
+              sudo cp "$backup" "$original"
+            done < <(sudo find /etc/nginx -name "*.$BACKUP_SUFFIX" -print0)
+            sudo /usr/sbin/nginx -t || true
+            exit 1
+          fi
+
           sudo /usr/sbin/nginx -t
           sudo /usr/bin/systemctl reload nginx
 
+          curl -fsS -X POST \
+            -H 'Content-Type: application/json' \
+            --data '{"role":"admin"}' \
+            http://127.0.0.1:4173/api/ai/session >/dev/null
+
           find "$SITE_DIR/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
           REMOTE
-

@@ -111,6 +111,14 @@ chmod 600 .env.production.local
 
 不要把 `.env.production.local`、`.env` 或 `.keyou-ai-provider.local.json` 上传到 git。当前 `.gitignore` 已覆盖这些文件。
 
+当前仓库的 GitHub Actions 会部署到 `savegpa.online`。需要以下 Secrets：
+
+- `SAVEGPA_SSH_HOST`、`SAVEGPA_SSH_USER`、`SAVEGPA_SSH_KEY`：连接服务器。
+- `DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL`：写入服务器本地 `.env.production.local`。
+- `KEYOU_ADMIN_USERNAME`、`KEYOU_ADMIN_PASSWORD`：管理员 `/ops` 登录。
+
+部署流水线会上传完整生产运行包，在服务器创建 `savegpa` systemd 服务，并把 Nginx 的 `/api/ai/*` 代理到 `127.0.0.1:4173`。不要再只部署 `dist` 静态目录。
+
 生产服务由 `server/productionServer.mjs` 提供，会同时处理：
 
 - `/api/ai/*`：DeepSeek 会话、配置、测试连接、生成课件。
