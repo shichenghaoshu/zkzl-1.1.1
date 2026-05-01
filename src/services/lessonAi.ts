@@ -104,7 +104,7 @@ export async function generateLessonWithAi(
       };
     }
 
-    const payload = await response.json();
+    const payload = await readJsonObject(response, "AI 生成接口");
     const data = asRecord(payload);
     const lesson = normalizeLesson(data.lesson, input);
 
@@ -146,7 +146,7 @@ export async function testAiProviderConnection(
       return { ok: false, message: `连接失败：${await readErrorText(response)}` };
     }
 
-    const payload = asRecord(await response.json());
+    const payload = asRecord(await readJsonObject(response, "DeepSeek 测试接口"));
     return {
       ok: payload.ok !== false,
       message: stringOr(payload.message, `连接测试通过：${provider.provider} / ${provider.model}`)
@@ -180,7 +180,7 @@ export async function saveAiProviderConfig(
       return { ok: false, message: `保存失败：${await readErrorText(response)}` };
     }
 
-    const payload = asRecord(await response.json());
+    const payload = asRecord(await readJsonObject(response, "DeepSeek 配置接口"));
     return {
       ok: payload.ok !== false,
       message: stringOr(payload.message, "DeepSeek 配置已保存到本地后端。")
@@ -208,7 +208,7 @@ export async function createAiSession(
       body: JSON.stringify(payload)
     });
 
-    const data = asRecord(await response.json());
+    const data = asRecord(await readJsonObject(response, "AI 会话接口"));
     const token = typeof data.token === "string" ? data.token : undefined;
     if (response.ok && token) {
       saveAiSessionToken(token);
@@ -360,4 +360,24 @@ async function readErrorText(response: ResponseLike) {
     return statusText || "HTTP 错误";
   }
   return statusText || "HTTP 错误";
+}
+
+async function readJsonObject(response: ResponseLike, label: string) {
+  if (response.text) {
+    const raw = await response.text();
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      throw new Error(`${label}没有返回内容。`);
+    }
+
+    if (trimmed.startsWith("<")) {
+      throw new Error(
+        `${label}返回了 HTML 页面，说明当前页面没有连到本地 /api/ai 代理。请使用 npm run dev 或 npm run preview 打开的 localhost 地址。`
+      );
+    }
+
+    return JSON.parse(trimmed) as unknown;
+  }
+
+  return response.json();
 }

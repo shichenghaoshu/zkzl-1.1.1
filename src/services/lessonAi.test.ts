@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ApiProviderConfig } from "../data/mockDatabase";
 import {
   buildChatCompletionsUrl,
+  createAiSession,
   generateLessonWithAi,
   getAiProviderStatus,
   testAiProviderConnection
@@ -153,5 +154,24 @@ describe("lesson AI generation", () => {
 
     const requestBody = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
     expect(requestBody.provider.apiKey).toBe("");
+  });
+
+  it("reports a clear error when the AI session endpoint returns the SPA HTML fallback", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "<html><head></head><body>app</body></html>",
+      json: async () => {
+        throw new Error("should not parse json directly");
+      }
+    });
+
+    const result = await createAiSession(
+      { mode: "admin", username: "admin", password: "keyou2026" },
+      fetchImpl
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("本地 /api/ai 代理");
+    expect(result.message).not.toContain("Unexpected token");
   });
 });
