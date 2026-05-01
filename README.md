@@ -90,6 +90,27 @@ npm run build
 PORT=4173 HOST=0.0.0.0 npm run start
 ```
 
+真实 DeepSeek Key 不提交到 git。生产后端会按优先级读取：
+
+1. 服务器环境变量：`DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL`。
+2. 服务器本地文件：`.env.production.local`、`.env.local`、`.env`。
+3. 服务器本地后端配置：`.keyou-ai-provider.local.json`。
+
+推荐在服务器项目根目录创建 `.env.production.local`，并设置 `600` 权限：
+
+```bash
+cat > .env.production.local <<'EOF'
+DEEPSEEK_API_KEY=你的真实 DeepSeek Key
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+KEYOU_ADMIN_USERNAME=admin
+KEYOU_ADMIN_PASSWORD=请换成强密码
+EOF
+chmod 600 .env.production.local
+```
+
+不要把 `.env.production.local`、`.env` 或 `.keyou-ai-provider.local.json` 上传到 git。当前 `.gitignore` 已覆盖这些文件。
+
 生产服务由 `server/productionServer.mjs` 提供，会同时处理：
 
 - `/api/ai/*`：DeepSeek 会话、配置、测试连接、生成课件。
@@ -625,6 +646,7 @@ AI API 通道配置表。
 - 避免生产静态部署把 `/api/ai/session` fallback 成 `index.html`。
 - 支持 `PORT`、`HOST`、`DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL` 环境变量。
 - 支持 `KEYOU_ADMIN_USERNAME`、`KEYOU_ADMIN_PASSWORD` 覆盖默认管理员账号。
+- 自动读取服务器本地 `.env.production.local` / `.env.local` / `.env`，这些文件只留在服务器。
 
 ### server/lessonPrompt.ts 与 prompts/deepseek-lesson-generation.skill.md
 
@@ -665,7 +687,7 @@ AI API 通道配置表。
 - 没有真实短信、邮箱或微信分享。
 - 没有真实账号密码系统。
 - `localStorage` 中的数据只适合同一浏览器演示；跨设备真实同步需要后端数据库。
-- DeepSeek API Key 保存在本机代理配置文件或环境变量中；生产环境需要后端权限、租户隔离和密钥管理。
+- DeepSeek API Key 只保存在服务器环境变量、服务器本地 env 文件或本地代理配置文件中；前端不会保存真实 Key，git 也不会提交真实 Key。生产环境仍建议接入正式密钥管理、租户隔离和审计。
 
 ## 接入真实后端的建议
 

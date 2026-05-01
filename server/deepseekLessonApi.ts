@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, resolve } from "node:path";
@@ -209,10 +209,34 @@ export async function loadProviderConfig() {
   if (envProvider) return envProvider;
 
   try {
+    await assertSecretFileMode(configPath);
     const raw = await readFile(configPath, "utf8");
     return normalizeProvider(JSON.parse(raw));
-  } catch {
-    return null;
+  } catch (error) {
+    if (isMissingFileError(error) || error instanceof SyntaxError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function isMissingFileError(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "ENOENT"
+  );
+}
+
+async function assertSecretFileMode(filePath: string) {
+  const raw = await readFile(filePath, "utf8");
+  if (!/"apiKey"\s*:\s*"sk-/i.test(raw)) return;
+
+  const fileStat = await stat(filePath);
+  const mode = fileStat.mode & 0o777;
+  if ((mode & 0o077) !== 0) {
+    throw new Error(`${filePath} 包含密钥但权限过宽，请执行 chmod 600 ${filePath}`);
   }
 }
 
