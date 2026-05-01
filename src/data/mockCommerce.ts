@@ -1,0 +1,275 @@
+export type BillingPlan = "trial" | "monthly" | "points";
+
+export type InviteCode = {
+  code: string;
+  name: string;
+  plan: BillingPlan;
+  monthlyQuota: number;
+  points: number;
+  valid: boolean;
+};
+
+export type AuthUser = {
+  id: string;
+  name: string;
+  organizationName: string;
+  role: "teacher" | "admin";
+  inviteCode: string;
+  createdAt: string;
+};
+
+export type UsageAccount = {
+  plan: BillingPlan;
+  monthlyQuota: number;
+  monthlyUsed: number;
+  points: number;
+  apiProvider: string;
+  apiEndpoint: string;
+  apiModel: string;
+  apiCredential: string;
+  expiresAt?: string;
+  lastRedeemedCode?: string;
+};
+
+export type RedeemCode = {
+  code: string;
+  type: "monthly" | "points";
+  label: string;
+  monthlyQuota?: number;
+  points?: number;
+  durationDays?: number;
+  active?: boolean;
+  used?: boolean;
+  usedAt?: string;
+  tenantName?: string;
+  createdAt?: string;
+};
+
+export type RedeemResult = {
+  ok: boolean;
+  message: string;
+  usage?: UsageAccount;
+};
+
+export const mockInviteCodes: InviteCode[] = [
+  {
+    code: "KEYOU-DEMO-2026",
+    name: "试用邀请码",
+    plan: "trial",
+    monthlyQuota: 20,
+    points: 120,
+    valid: true
+  },
+  {
+    code: "MONTH-TEACHER-2026",
+    name: "月付老师邀请码",
+    plan: "monthly",
+    monthlyQuota: 300,
+    points: 0,
+    valid: true
+  },
+  {
+    code: "POINTS-ORG-2026",
+    name: "次付点券邀请码",
+    plan: "points",
+    monthlyQuota: 0,
+    points: 1000,
+    valid: true
+  }
+];
+
+export const mockRedeemCodes: RedeemCode[] = [
+  {
+    code: "MONTH-735921",
+    type: "monthly",
+    label: "月付用户核销码",
+    monthlyQuota: 300,
+    durationDays: 31
+  },
+  {
+    code: "MONTH-PLUS-888",
+    type: "monthly",
+    label: "机构月度加量码",
+    monthlyQuota: 800,
+    durationDays: 31
+  },
+  {
+    code: "POINT-1000-KY",
+    type: "points",
+    label: "次付点券核销码",
+    points: 1000
+  },
+  {
+    code: "POINT-300-DEMO",
+    type: "points",
+    label: "体验点券核销码",
+    points: 300
+  }
+];
+
+export const defaultApiConfig = {
+  provider: "OpenAI 兼容网关",
+  endpoint: "https://api.keyou-ai.local/v1/lesson-generate",
+  model: "keyou-lesson-pro"
+};
+
+export const createUserFromInvite = (
+  inviteCode: string,
+  name: string,
+  organizationName: string,
+  inviteCodes: InviteCode[] = mockInviteCodes
+): { user: AuthUser; usage: UsageAccount } | null => {
+  const invite = inviteCodes.find(
+    (item) => item.valid && item.code.toUpperCase() === inviteCode.trim().toUpperCase()
+  );
+
+  if (!invite) return null;
+
+  const user: AuthUser = {
+    id: `user-${invite.code.toLowerCase().replace(/-/g, "")}`,
+    name: name.trim() || "王老师",
+    organizationName: organizationName.trim() || "课游AI 体验学校",
+    role: invite.plan === "trial" ? "teacher" : "admin",
+    inviteCode: invite.code,
+    createdAt: new Date().toISOString()
+  };
+
+  const usage: UsageAccount = {
+    plan: invite.plan,
+    monthlyQuota: invite.monthlyQuota,
+    monthlyUsed: invite.plan === "monthly" ? 12 : 0,
+    points: invite.points,
+    apiProvider: defaultApiConfig.provider,
+    apiEndpoint: defaultApiConfig.endpoint,
+    apiModel: defaultApiConfig.model,
+    apiCredential: "",
+    expiresAt: invite.plan === "monthly" ? addDays(31) : undefined
+  };
+
+  return { user, usage };
+};
+
+export const generateInviteCode = (organizationName: string, plan: BillingPlan) => {
+  const prefix = plan === "monthly" ? "MONTH" : plan === "points" ? "POINTS" : "TRIAL";
+  const orgMark = organizationName
+    .trim()
+    .replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "")
+    .slice(0, 4)
+    .toUpperCase();
+  const random = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${prefix}-${orgMark || "ORG"}-${random}`;
+};
+
+export const generateApiCredential = (user: AuthUser) => {
+  const org = user.organizationName
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 8)
+    .toLowerCase();
+  const random = Math.random().toString(36).slice(2, 14);
+  return `kyai_${org || "school"}_${random}`;
+};
+
+export const maskCredential = (credential: string) => {
+  if (!credential) return "未生成";
+  if (credential.length <= 12) return credential;
+  return `${credential.slice(0, 9)}••••${credential.slice(-4)}`;
+};
+
+export const getPlanLabel = (plan: BillingPlan) => {
+  if (plan === "monthly") return "月付用户";
+  if (plan === "points") return "次付点券";
+  return "试用账户";
+};
+
+export const getRemainingMonthlyQuota = (usage: UsageAccount) =>
+  Math.max(0, usage.monthlyQuota - usage.monthlyUsed);
+
+export const canGenerateLesson = (usage: UsageAccount): { ok: boolean; message: string } => {
+  if (usage.plan === "monthly" || usage.plan === "trial") {
+    const remaining = getRemainingMonthlyQuota(usage);
+    return remaining > 0
+      ? { ok: true, message: `本次生成将消耗 1 次月度额度，剩余 ${remaining - 1} 次。` }
+      : { ok: false, message: "月度额度不足，请到后端配置中心核销月付码或切换点券。"}
+  }
+
+  return usage.points >= 80
+    ? { ok: true, message: `本次生成将消耗 80 点券，剩余 ${usage.points - 80} 点。` }
+    : { ok: false, message: "点券不足，请到后端配置中心核销点券码。"}
+};
+
+export const consumeLessonGeneration = (usage: UsageAccount): RedeemResult => {
+  const check = canGenerateLesson(usage);
+  if (!check.ok) return { ok: false, message: check.message };
+
+  if (usage.plan === "points") {
+    return {
+      ok: true,
+      message: check.message,
+      usage: { ...usage, points: usage.points - 80 }
+    };
+  }
+
+  return {
+    ok: true,
+    message: check.message,
+    usage: { ...usage, monthlyUsed: usage.monthlyUsed + 1 }
+  };
+};
+
+export const redeemUsageCode = (
+  usage: UsageAccount,
+  code: string,
+  redeemedCodes: string[],
+  redeemCodes: RedeemCode[] = mockRedeemCodes
+): RedeemResult => {
+  const normalizedCode = code.trim().toUpperCase();
+  const match = redeemCodes.find((item) => item.code === normalizedCode);
+
+  if (!match) {
+    return { ok: false, message: "核销码不存在，请检查大小写和横杠。" };
+  }
+
+  if (match.active === false) {
+    return { ok: false, message: "该核销码已被 Ops 后台停用。" };
+  }
+
+  if (match.used) {
+    return { ok: false, message: "该核销码已被核销，不能重复使用。" };
+  }
+
+  if (redeemedCodes.includes(match.code)) {
+    return { ok: false, message: "该核销码已在当前 Demo 会话中使用。" };
+  }
+
+  if (match.type === "monthly") {
+    return {
+      ok: true,
+      message: `核销成功：已开通 ${match.durationDays} 天月付权益，增加 ${match.monthlyQuota} 次生成额度。`,
+      usage: {
+        ...usage,
+        plan: "monthly",
+        monthlyQuota: (usage.plan === "monthly" ? usage.monthlyQuota : 0) + (match.monthlyQuota ?? 0),
+        monthlyUsed: usage.plan === "monthly" ? usage.monthlyUsed : 0,
+        expiresAt: addDays(match.durationDays ?? 31),
+        lastRedeemedCode: match.code
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    message: `核销成功：已为次付账户增加 ${match.points} 点券。`,
+    usage: {
+      ...usage,
+      plan: usage.plan === "monthly" ? "monthly" : "points",
+      points: usage.points + (match.points ?? 0),
+      lastRedeemedCode: match.code
+    }
+  };
+};
+
+const addDays = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+};
