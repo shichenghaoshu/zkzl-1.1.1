@@ -75,6 +75,7 @@ jobs:
           SSH_HOST: ${{ secrets.SAVEGPA_SSH_HOST }}
           SSH_USER: ${{ secrets.SAVEGPA_SSH_USER }}
           SSH_KEY: ${{ secrets.SAVEGPA_SSH_KEY }}
+          SAVEGPA_SUDO_PASSWORD: ${{ secrets.SAVEGPA_SUDO_PASSWORD }}
         run: |
           set -euo pipefail
 
@@ -102,6 +103,11 @@ jobs:
 
           scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-app.tgz" "$SSH_USER@$SSH_HOST:/tmp/savegpa-app-$RELEASE_ID.tgz"
           scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-env.production.local" "$SSH_USER@$SSH_HOST:/tmp/savegpa-env-$RELEASE_ID"
+          if [ -n "${SAVEGPA_SUDO_PASSWORD:-}" ]; then
+            printf '%s\n' "$SAVEGPA_SUDO_PASSWORD" > "$RUNNER_TEMP/savegpa-sudo-password"
+            chmod 600 "$RUNNER_TEMP/savegpa-sudo-password"
+            scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-sudo-password" "$SSH_USER@$SSH_HOST:/tmp/savegpa-sudo-$RELEASE_ID"
+          fi
 
           ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" "bash -s -- '$RELEASE_ID' '$GITHUB_SHA'" <<'REMOTE'
           set -euo pipefail
@@ -114,6 +120,28 @@ jobs:
           ENV_UPLOAD="/tmp/savegpa-env-$DEPLOY_ID"
           RELEASE="$SITE_DIR/releases/$DEPLOY_ID"
           SHARED="$SITE_DIR/shared"
+          SUDO_PASS_FILE="/tmp/savegpa-sudo-$DEPLOY_ID"
+          SERVICE_TMP="/tmp/$SERVICE_NAME.service.$DEPLOY_ID"
+          NGINX_PATCH="/tmp/savegpa-nginx-patch-$DEPLOY_ID.py"
+
+          cleanup() {
+            rm -f "$SUDO_PASS_FILE" "$SERVICE_TMP" "$NGINX_PATCH"
+          }
+          trap cleanup EXIT
+
+          sudo_cmd() {
+            if [ -s "$SUDO_PASS_FILE" ]; then
+              sudo -S "$@" < "$SUDO_PASS_FILE"
+            else
+              sudo -n "$@"
+            fi
+          }
+
+          if ! sudo_cmd true; then
+            echo "Server sudo access is required to install the Node service and update Nginx." >&2
+            echo "Set GitHub secret SAVEGPA_SUDO_PASSWORD or use a deploy user with passwordless sudo for this workflow." >&2
+            exit 1
+          fi
 
           NODE_BIN="$(command -v node || true)"
           if [ -z "$NODE_BIN" ]; then
@@ -144,7 +172,7 @@ jobs:
           printf '%s\n' "$COMMIT_SHA" > "$SITE_DIR/.deployed_commit"
 
           DEPLOY_USER="$(id -un)"
-          sudo tee "/etc/systemd/system/$SERVICE_NAME.service" >/dev/null <<SERVICE
+          cat > "$SERVICE_TMP" <<SERVICE
           [Unit]
           Description=savegpa Node production server
           After=network.target
@@ -164,18 +192,20 @@ jobs:
           WantedBy=multi-user.target
           SERVICE
 
-          sudo /usr/bin/systemctl daemon-reload
-          sudo /usr/bin/systemctl enable "$SERVICE_NAME"
-          sudo /usr/bin/systemctl restart "$SERVICE_NAME"
+          sudo_cmd cp "$SERVICE_TMP" "/etc/systemd/system/$SERVICE_NAME.service"
+          sudo_cmd chmod 644 "/etc/systemd/system/$SERVICE_NAME.service"
+          sudo_cmd /usr/bin/systemctl daemon-reload
+          sudo_cmd /usr/bin/systemctl enable "$SERVICE_NAME"
+          sudo_cmd /usr/bin/systemctl restart "$SERVICE_NAME"
           sleep 2
-          sudo /usr/bin/systemctl is-active --quiet "$SERVICE_NAME"
+          sudo_cmd /usr/bin/systemctl is-active --quiet "$SERVICE_NAME"
           curl -fsS -X POST \
             -H 'Content-Type: application/json' \
             --data '{"role":"admin"}' \
             http://127.0.0.1:4173/api/ai/session >/dev/null
 
           BACKUP_SUFFIX="bak-$DEPLOY_ID"
-          sudo /usr/bin/python3 - "$DEPLOY_ID" <<'PY'
+          cat > "$NGINX_PATCH" <<'PY'
           import pathlib
           import re
           import shutil
@@ -255,19 +285,20 @@ jobs:
           if not patched_any:
               print("nginx config already patched or no matching server block found")
           PY
+          sudo_cmd /usr/bin/python3 "$NGINX_PATCH" "$DEPLOY_ID"
 
-          if ! sudo /usr/sbin/nginx -t; then
+          if ! sudo_cmd /usr/sbin/nginx -t; then
             echo "nginx config test failed, restoring backups" >&2
             while IFS= read -r -d '' backup; do
               original="${backup%.$BACKUP_SUFFIX}"
-              sudo cp "$backup" "$original"
-            done < <(sudo find /etc/nginx -name "*.$BACKUP_SUFFIX" -print0)
-            sudo /usr/sbin/nginx -t || true
+              sudo_cmd cp "$backup" "$original"
+            done < <(sudo_cmd find /etc/nginx -name "*.$BACKUP_SUFFIX" -print0)
+            sudo_cmd /usr/sbin/nginx -t || true
             exit 1
           fi
 
-          sudo /usr/sbin/nginx -t
-          sudo /usr/bin/systemctl reload nginx
+          sudo_cmd /usr/sbin/nginx -t
+          sudo_cmd /usr/bin/systemctl reload nginx
 
           curl -fsS -X POST \
             -H 'Content-Type: application/json' \

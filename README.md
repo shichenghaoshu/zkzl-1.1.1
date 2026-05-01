@@ -114,6 +114,7 @@ chmod 600 .env.production.local
 当前仓库的 GitHub Actions 会部署到 `savegpa.online`。需要以下 Secrets：
 
 - `SAVEGPA_SSH_HOST`、`SAVEGPA_SSH_USER`、`SAVEGPA_SSH_KEY`：连接服务器。
+- `SAVEGPA_SUDO_PASSWORD`：可选；如果部署用户没有免密 sudo，用它创建 systemd 服务和更新 Nginx。
 - `DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL`：写入服务器本地 `.env.production.local`。
 - `KEYOU_ADMIN_USERNAME`、`KEYOU_ADMIN_PASSWORD`：管理员 `/ops` 登录。
 
