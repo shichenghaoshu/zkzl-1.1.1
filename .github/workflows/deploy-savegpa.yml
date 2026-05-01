@@ -1,0 +1,98 @@
+name: Deploy savegpa.online
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: savegpa-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package build output
+        run: tar -C dist -czf "$RUNNER_TEMP/savegpa-dist.tgz" .
+
+      - name: Deploy to server
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SAVEGPA_SSH_HOST }}
+          SSH_USER: ${{ secrets.SAVEGPA_SSH_USER }}
+          SSH_KEY: ${{ secrets.SAVEGPA_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          for name in SSH_HOST SSH_USER SSH_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing GitHub secret: $name" >&2
+              exit 1
+            fi
+          done
+
+          RELEASE_ID="${GITHUB_SHA::7}-$(date -u +%Y%m%dT%H%M%SZ)"
+          KEY_FILE="$RUNNER_TEMP/savegpa_deploy_key"
+          KNOWN_HOSTS="$RUNNER_TEMP/known_hosts"
+
+          printf '%s\n' "$SSH_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          ssh-keyscan -H "$SSH_HOST" > "$KNOWN_HOSTS"
+
+          SSH_OPTS=(
+            -i "$KEY_FILE"
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$KNOWN_HOSTS"
+          )
+
+          scp "${SSH_OPTS[@]}" "$RUNNER_TEMP/savegpa-dist.tgz" "$SSH_USER@$SSH_HOST:/tmp/savegpa-dist-$RELEASE_ID.tgz"
+
+          ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" "bash -s -- '$RELEASE_ID' '$GITHUB_SHA'" <<'REMOTE'
+          set -euo pipefail
+
+          DEPLOY_ID="$1"
+          COMMIT_SHA="$2"
+          SITE_DIR="/var/www/savegpa"
+          ARCHIVE="/tmp/savegpa-dist-$DEPLOY_ID.tgz"
+          RELEASE="$SITE_DIR/releases/$DEPLOY_ID"
+
+          test -s "$ARCHIVE"
+          mkdir -p "$RELEASE"
+          tar -C "$RELEASE" -xzf "$ARCHIVE"
+          rm -f "$ARCHIVE"
+
+          find "$RELEASE" -type d -exec chmod 755 {} +
+          find "$RELEASE" -type f -exec chmod 644 {} +
+
+          ln -sfnT "releases/$DEPLOY_ID" "$SITE_DIR/current"
+          printf '%s\n' "$COMMIT_SHA" > "$SITE_DIR/.deployed_commit"
+
+          sudo /usr/sbin/nginx -t
+          sudo /usr/bin/systemctl reload nginx
+
+          find "$SITE_DIR/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
+          REMOTE
+
