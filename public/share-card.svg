@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#DBEAFE"/>
+      <stop offset="0.58" stop-color="#EFF6FF"/>
+      <stop offset="1" stop-color="#DCFCE7"/>
+    </linearGradient>
+    <linearGradient id="btn" x1="0" x2="1">
+      <stop offset="0" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1020" cy="110" r="100" fill="#FACC15" opacity="0.38"/>
+  <circle cx="150" cy="520" r="130" fill="#8B5CF6" opacity="0.16"/>
+  <rect x="84" y="76" width="1032" height="478" rx="42" fill="#FFFFFF" opacity="0.9"/>
+  <text x="130" y="182" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="72" font-weight="900" fill="#0F172A">课游AI</text>
+  <text x="130" y="270" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="48" font-weight="800" fill="#2563EB">输入知识点，生成一节能玩的课</text>
+  <g transform="translate(130 330)">
+    <rect width="620" height="82" rx="24" fill="url(#btn)"/>
+    <text x="42" y="54" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="34" font-weight="900" fill="#FFFFFF">链接参与｜二维码｜PIN码｜班级反馈</text>
+  </g>
+  <g transform="translate(835 178)">
+    <circle cx="98" cy="84" r="68" fill="#EFF6FF" stroke="#2563EB" stroke-width="10"/>
+    <circle cx="76" cy="78" r="9" fill="#0F172A"/>
+    <circle cx="120" cy="78" r="9" fill="#0F172A"/>
+    <path d="M80 110c18 18 38 18 56 0" fill="none" stroke="#0F172A" stroke-width="8" stroke-linecap="round"/>
+    <rect x="48" y="150" width="100" height="118" rx="32" fill="#DBEAFE" stroke="#2563EB" stroke-width="10"/>
+    <text x="70" y="218" font-family="Arial, sans-serif" font-size="28" font-weight="900" fill="#2563EB">AI</text>
+    <text x="-6" y="330" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="34" font-weight="900" fill="#0F172A">课游小熊</text>
+  </g>
+</svg>

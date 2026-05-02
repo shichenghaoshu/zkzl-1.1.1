@@ -35,12 +35,12 @@ export function AuthPage({
   const [name, setName] = useState("王老师");
   const [organizationName, setOrganizationName] = useState("三年级数学教研组");
   const [inviteCode, setInviteCode] = useState("KEYOU-DEMO-2026");
-  const [message, setMessage] = useState("输入有效邀请码即可注册并登录 Demo 账户。");
+  const [message, setMessage] = useState("输入有效邀请码即可注册并登录体验账号。");
 
   const submit = async () => {
     const result = createUserFromInvite(inviteCode, name, organizationName, inviteCodes);
     if (!result) {
-      setMessage("邀请码校验失败：请使用下方 Demo 邀请码，或到后台生成新邀请码。");
+      setMessage("邀请码无效，请检查后重试，或联系管理员获取邀请码");
       return;
     }
 
@@ -72,7 +72,10 @@ export function AuthPage({
             使用机构发放的邀请码开通账号。月付用户可通过核销码开通月度额度；次付用户可通过点券核销码充值。
           </p>
 
-          <div className="mt-6 grid gap-5">
+          <form className="mt-6 grid gap-5" onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}>
             <label className="block">
               <span className="mb-2 block text-sm font-black text-slate-600">老师姓名</span>
               <input
@@ -97,16 +100,22 @@ export function AuthPage({
                 onChange={(event) => setInviteCode(event.target.value)}
               />
             </label>
-          </div>
+            <p className="text-sm font-bold leading-6 text-slate-700">
+              使用即表示你已阅读并同意
+              <button type="button" className="mx-1 font-black text-skybrand underline-offset-4 hover:underline" onClick={() => onNavigate("legalTerms")}>《用户协议》</button>
+              <button type="button" className="font-black text-skybrand underline-offset-4 hover:underline" onClick={() => onNavigate("legalPrivacy")}>《隐私政策》</button>
+              。
+            </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button size="lg" onClick={submit}>
+            <div className="flex flex-wrap gap-3">
+            <Button type="submit" size="lg">
               🔐 邀请码登录
             </Button>
             <Button variant="white" size="lg" onClick={() => onNavigate("backend")}>
               ⚙️ 去后台生成邀请码
             </Button>
-          </div>
+            </div>
+          </form>
 
           <div className="mt-5 rounded-3xl bg-blue-50 p-4 text-sm font-black text-slate-600">
             {message}
@@ -145,7 +154,7 @@ export function AuthPage({
           </Card>
 
           <Card tone="mint">
-            <h3 className="text-2xl font-black text-skybrand">可用 Demo 邀请码</h3>
+            <h3 className="text-2xl font-black text-skybrand">可用体验邀请码</h3>
             <div className="mt-4 space-y-3">
               {inviteCodes.map((item) => (
                 <button

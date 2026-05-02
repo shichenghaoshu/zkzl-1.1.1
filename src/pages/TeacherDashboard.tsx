@@ -73,11 +73,12 @@ export function TeacherDashboard({ user, usage, onNavigate }: TeacherDashboardPr
               查看全部
             </button>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {recentLessons.map((lesson, index) => (
+          {recentLessons.length ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {recentLessons.map((lesson, index) => (
               <button
                 key={lesson.id}
-                className="group rounded-3xl bg-gradient-to-b from-blue-50 to-white p-3 text-left shadow-md transition-all hover:-translate-y-1 hover:shadow-xl"
+                className="group cursor-pointer rounded-3xl bg-gradient-to-b from-blue-50 to-white p-3 text-left shadow-md transition-all hover:-translate-y-1 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-200"
                 onClick={() => onNavigate(index === 0 ? "editor" : "generate")}
               >
                 <div className="flex h-28 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-200 to-emerald-100 text-5xl">
@@ -87,8 +88,15 @@ export function TeacherDashboard({ user, usage, onNavigate }: TeacherDashboardPr
                 <p className="mt-1 text-sm font-bold text-slate-500">{lesson.grade}</p>
                 <p className="mt-1 text-sm font-bold text-skybrand">{lesson.time}</p>
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl bg-blue-50 p-6 text-center">
+              <h3 className="text-2xl font-black text-ink">还没有课件</h3>
+              <p className="mt-2 text-base font-bold text-slate-700">输入一个知识点，生成第一节互动游戏课吧</p>
+              <Button className="mt-4" onClick={() => onNavigate("generate")}>立即生成</Button>
+            </div>
+          )}
         </Card>
 
         <Card tone="blue">
@@ -151,6 +159,36 @@ export function TeacherDashboard({ user, usage, onNavigate }: TeacherDashboardPr
           </Card>
         ))}
       </div>
+
+      <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+        <Card className="p-6">
+          <h2 className="text-2xl font-black text-ink">为什么小学老师喜欢课游AI？</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {[
+              ["备课更快", "输入知识点，一键生成互动课", "⚡"],
+              ["参与更高", "学生点链接即可闯关", "🎮"],
+              ["反馈更清楚", "老师实时查看班级数据", "📊"]
+            ].map(([title, text, icon]) => (
+              <div key={title} className="rounded-3xl bg-blue-50 p-4">
+                <span className="text-3xl" aria-hidden="true">{icon}</span>
+                <p className="mt-2 text-lg font-black text-ink">{title}</p>
+                <p className="mt-1 text-sm font-bold leading-6 text-slate-700">{text}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card tone="mint" className="p-6">
+          <h2 className="text-2xl font-black text-ink">适合场景</h2>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {["小学数学复习课", "英语单词互动课", "科学分类课", "班会安全教育", "教培体验课", "公开展示课"].map((item) => (
+              <span key={item} className="rounded-2xl bg-white px-4 py-3 text-base font-black text-ink shadow-sm">
+                {item}
+              </span>
+            ))}
+          </div>
+        </Card>
+      </section>
     </div>
   );
 }

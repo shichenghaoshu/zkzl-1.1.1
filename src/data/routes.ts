@@ -8,7 +8,14 @@ export type AppRoute =
   | "play"
   | "report"
   | "backend"
-  | "ops";
+  | "ops"
+  | "help"
+  | "legalPrivacy"
+  | "legalTerms"
+  | "legalChildren"
+  | "legalCopyright"
+  | "lessonLoadError"
+  | "notFound";
 
 export const routePaths: Record<AppRoute, string> = {
   login: "/login",
@@ -20,14 +27,21 @@ export const routePaths: Record<AppRoute, string> = {
   play: "/play",
   report: "/report",
   backend: "/backend",
-  ops: "/ops"
+  ops: "/ops",
+  help: "/help",
+  legalPrivacy: "/legal/privacy",
+  legalTerms: "/legal/terms",
+  legalChildren: "/legal/children",
+  legalCopyright: "/legal/copyright",
+  lessonLoadError: "/lesson-error",
+  notFound: "/404"
 };
 
 export const pathToRoute = (path: string): AppRoute => {
   const found = (Object.entries(routePaths) as Array<[AppRoute, string]>).find(
     ([, routePath]) => routePath === path
   );
-  return found?.[0] ?? "teacher-dashboard";
+  return found?.[0] ?? "notFound";
 };
 
 export const mainNavItems: Array<{

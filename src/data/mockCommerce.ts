@@ -303,7 +303,7 @@ export const redeemUsageCode = (
   }
 
   if (redeemedCodes.includes(match.code)) {
-    return { ok: false, message: "该核销码已在当前 Demo 会话中使用。" };
+    return { ok: false, message: "该核销码已在当前体验会话中使用。" };
   }
 
   if (match.type === "monthly") {

@@ -11,7 +11,7 @@ export function Mascot({ size = 148, className = "", label = "AI" }: MascotProps
     <div
       className={["mascot-wrap animate-bounce-soft", className].join(" ")}
       style={{ "--mascot-size": `${size}px` } as CSSProperties}
-      aria-label="戴着耳机和小背包的 AI 小熊"
+      aria-label="课游AI小熊助手"
       role="img"
     >
       <div className="mascot-ear mascot-ear-left" />

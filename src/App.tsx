@@ -22,7 +22,11 @@ import { AuthPage } from "./pages/AuthPage";
 import { BackendConsole } from "./pages/BackendConsole";
 import { ClassReport } from "./pages/ClassReport";
 import { GenerateLesson } from "./pages/GenerateLesson";
+import { HelpCenter } from "./pages/HelpCenter";
 import { LessonEditor } from "./pages/LessonEditor";
+import { LegalPage } from "./pages/LegalPage";
+import { LessonLoadErrorPage } from "./pages/LessonLoadErrorPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { OpsConsole } from "./pages/OpsConsole";
 import { OpsLoginPage } from "./pages/OpsLoginPage";
 import { ShareLesson } from "./pages/ShareLesson";
@@ -52,6 +56,17 @@ const readStoredJson = <T,>(key: string): T | null => {
     return null;
   }
 };
+
+function setMeta(name: string, content: string, attribute: "name" | "property" = "name") {
+  const selector = `meta[${attribute}="${name}"]`;
+  let element = document.querySelector<HTMLMetaElement>(selector);
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute(attribute, name);
+    document.head.appendChild(element);
+  }
+  element.content = content;
+}
 
 const accountStoreKey = "keyou-account-store";
 const generatedLessonKey = "keyou-generated-lesson";
@@ -107,10 +122,37 @@ export default function App() {
       play: "学生端游戏课件页",
       report: "班级数据报告",
       backend: "权益与核销中心",
-      ops: "Ops 运营后台"
+      ops: "Ops 运营后台",
+      help: "帮助中心",
+      legalPrivacy: "隐私政策",
+      legalTerms: "用户服务协议",
+      legalChildren: "儿童个人信息保护说明",
+      legalCopyright: "版权与内容使用说明",
+      lessonLoadError: "课件加载失败",
+      notFound: "页面未找到"
     };
-    document.title = `${titles[route]} | 课游AI`;
-  }, [route]);
+    const defaultTitle = "课游AI｜AI互动游戏课件生成平台";
+    const defaultDescription =
+      "课游AI面向小学老师和教培机构，支持输入知识点一键生成闯关、竞答、拖拽、配对等互动游戏课件。学生点链接即可参与，老师实时查看班级反馈。";
+    const pageTitle =
+      route === "play"
+        ? `${generatedLesson?.title ?? "分数闯关挑战"}｜课游AI互动游戏课件`
+        : route === "teacher-dashboard"
+          ? defaultTitle
+          : `${titles[route]}｜课游AI`;
+    const pageDescription =
+      route === "play"
+        ? `${generatedLesson?.grade ?? "三年级数学"}${generatedLesson?.subject ?? "认识分数"}互动闯关课，学生点击链接即可参与课堂游戏。`
+        : defaultDescription;
+
+    document.title = pageTitle;
+    setMeta("description", pageDescription);
+    setMeta("og:title", pageTitle, "property");
+    setMeta("og:description", pageDescription, "property");
+    setMeta("og:url", `https://savegpa.online${window.location.pathname}`, "property");
+    setMeta("twitter:title", pageTitle);
+    setMeta("twitter:description", pageDescription);
+  }, [route, generatedLesson]);
 
   useEffect(() => {
     if (authUser) {
@@ -354,6 +396,13 @@ export default function App() {
       {!needsAuth && route === "ops" && authUser?.role !== "admin" ? (
         <OpsLoginPage onLogin={login} onNavigate={navigate} />
       ) : null}
+      {route === "help" ? <HelpCenter /> : null}
+      {route === "legalPrivacy" ? <LegalPage kind="privacy" onNavigate={navigate} /> : null}
+      {route === "legalTerms" ? <LegalPage kind="terms" onNavigate={navigate} /> : null}
+      {route === "legalChildren" ? <LegalPage kind="children" onNavigate={navigate} /> : null}
+      {route === "legalCopyright" ? <LegalPage kind="copyright" onNavigate={navigate} /> : null}
+      {route === "lessonLoadError" ? <LessonLoadErrorPage onNavigate={navigate} /> : null}
+      {route === "notFound" ? <NotFoundPage onNavigate={navigate} /> : null}
     </Layout>
   );
 }

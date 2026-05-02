@@ -8,6 +8,69 @@
     linear-gradient(180deg, #dcf8ff 0%, #edf8ff 44%, #fff9ee 100%);
 }
 
+.form-control {
+  min-height: 48px;
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  background: #fff;
+  padding: 0.75rem 1rem;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  outline: none;
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.support-menu-button {
+  min-height: 44px;
+  border-radius: 1rem;
+  background: #eff6ff;
+  padding: 0.65rem 0.9rem;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 900;
+  text-align: left;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.support-menu-button:hover,
+.support-menu-button:focus {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.keyou-bigscreen .app-sidebar,
+.keyou-bigscreen .mobile-header,
+.keyou-bigscreen .app-footer,
+.keyou-bigscreen .support-widget {
+  display: none !important;
+}
+
+.keyou-bigscreen .student-play-page {
+  max-width: none;
+}
+
+.student-play-large h1 {
+  font-size: clamp(2.75rem, 5vw, 5.25rem);
+}
+
+.student-play-large .game-card {
+  min-height: 70vh;
+}
+
+.student-play-large .game-card h2 {
+  font-size: clamp(2.5rem, 5.2vw, 5.75rem);
+}
+
+.student-play-large button {
+  font-size: 1.125rem;
+}
+
 .app-background::before,
 .app-background::after {
   position: fixed;

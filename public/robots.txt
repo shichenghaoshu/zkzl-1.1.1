@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /ops
+Disallow: /api
+Disallow: /teacher/sessions
+
+Sitemap: https://savegpa.online/sitemap.xml

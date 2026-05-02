@@ -31,8 +31,8 @@ export function GameMap({
   const activeLevels = customLevels?.length ? customLevels : levels;
 
   return (
-    <section className="game-card min-h-[520px] bg-gradient-to-br from-sky-200 via-blue-100 to-emerald-100 p-5">
-      <div className="absolute inset-0 soft-grid opacity-30" />
+    <section className="game-card min-h-[520px] select-none bg-gradient-to-br from-sky-200 via-blue-100 to-emerald-100 p-5">
+      <div className="pointer-events-none absolute inset-0 soft-grid opacity-30" aria-hidden="true" />
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1 basis-full sm:basis-auto">
@@ -50,11 +50,11 @@ export function GameMap({
         </div>
 
         <div className="relative mt-4 min-h-[380px] overflow-hidden rounded-3xl bg-gradient-to-b from-sky-300 to-emerald-200 p-5 shadow-inner">
-          <div className="map-path" />
-          <div className="absolute left-8 top-10 text-7xl drop-shadow-lg">🏰</div>
-          <div className="absolute bottom-10 right-10 text-6xl drop-shadow-lg">🎁</div>
-          <div className="absolute right-20 top-14 text-5xl animate-pulse-star">⭐</div>
-          <div className="absolute bottom-8 left-16 text-5xl">🪙</div>
+          <div className="pointer-events-none map-path" aria-hidden="true" />
+          <div className="pointer-events-none absolute left-8 top-10 text-7xl drop-shadow-lg" aria-hidden="true">🏰</div>
+          <div className="pointer-events-none absolute bottom-10 right-10 text-6xl drop-shadow-lg" aria-hidden="true">🎁</div>
+          <div className="pointer-events-none absolute right-20 top-14 text-5xl animate-pulse-star" aria-hidden="true">⭐</div>
+          <div className="pointer-events-none absolute bottom-8 left-16 text-5xl" aria-hidden="true">🪙</div>
 
           <div className="relative z-10 grid min-h-[330px] grid-cols-2 gap-4 pt-20 sm:grid-cols-5 sm:items-end">
             {activeLevels.map((level, index) => (
@@ -62,12 +62,13 @@ export function GameMap({
                 key={level.id}
                 onClick={() => level.status !== "locked" && onSelect(index)}
                 disabled={level.status === "locked"}
+                aria-label={`${level.name}${level.status === "locked" ? "，未解锁" : "，点击进入关卡"}`}
                 className={[
-                  "group flex flex-col items-center gap-2 rounded-3xl p-3 transition-all",
+                  "group flex flex-col items-center gap-2 rounded-3xl p-3 transition-all focus:outline-none focus:ring-4 focus:ring-blue-200",
                   index % 2 === 0 ? "self-start" : "self-end",
                   level.status === "locked"
-                    ? "opacity-70"
-                    : "hover:-translate-y-2 hover:scale-[1.02]"
+                    ? "cursor-not-allowed opacity-70"
+                    : "cursor-pointer hover:-translate-y-2 hover:scale-[1.02]"
                 ].join(" ")}
               >
                 <span

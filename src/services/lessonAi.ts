@@ -53,7 +53,7 @@ export function getAiProviderStatus(providers: ApiProviderConfig[]): AiProviderS
   if (!provider) {
     return {
       ok: false,
-      message: "管理员需要先在 Ops 后台填写真实 DeepSeek API Key、Base URL 和模型，默认 demo key 不会用于真实 AI 生成。"
+      message: "管理员需要先在 Ops 后台填写真实 DeepSeek API Key、Base URL 和模型，默认体验密钥不会用于真实 AI 生成。"
     };
   }
 

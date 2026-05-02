@@ -16,7 +16,7 @@ export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
   const [copied, setCopied] = useState("尚未复制");
   const [published, setPublished] = useState(false);
   const activeLesson = lesson ?? mockLesson;
-  const shareUrl = `https://keyou.ai/c/${activeLesson.id.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "abc123"}`;
+  const shareUrl = `https://savegpa.online/play?lesson=${activeLesson.id.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "abc123"}`;
 
   const markCopied = (text: string) => {
     setCopied(text);

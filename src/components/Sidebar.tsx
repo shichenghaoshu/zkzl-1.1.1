@@ -12,12 +12,12 @@ type SidebarProps = {
 
 export function Sidebar({ activeRoute, onNavigate, user, usage, onLogout }: SidebarProps) {
   return (
-    <aside className="glass-panel sticky top-4 hidden h-[calc(100vh-2rem)] w-64 shrink-0 overflow-y-auto rounded-3xl p-4 shadow-xl shadow-blue-200/30 lg:block">
+    <aside className="app-sidebar glass-panel sticky top-4 hidden h-[calc(100vh-2rem)] w-64 shrink-0 overflow-y-auto rounded-3xl p-4 shadow-xl shadow-blue-200/30 lg:block">
       <button
         className="mb-6 flex w-full items-center gap-3 rounded-3xl bg-white/70 p-3 text-left"
         onClick={() => onNavigate("teacher-dashboard")}
       >
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-skybrand to-mintbrand text-xl text-white shadow-lg">
+        <span className="flex h-12 w-12 select-none items-center justify-center rounded-2xl bg-gradient-to-br from-skybrand to-mintbrand text-xl text-white shadow-lg" aria-hidden="true">
           🎯
         </span>
         <span>
@@ -40,7 +40,7 @@ export function Sidebar({ activeRoute, onNavigate, user, usage, onLogout }: Side
                 : "text-slate-600 hover:bg-white/78 hover:text-skybrand"
             ].join(" ")}
           >
-            <span className="text-xl">{item.icon}</span>
+            <span className="select-none text-xl" aria-hidden="true">{item.icon}</span>
             <span>
               <span className="block text-sm font-black">{item.label}</span>
               <span

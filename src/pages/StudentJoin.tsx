@@ -22,7 +22,7 @@ export function StudentJoin({ onNavigate }: StudentJoinProps) {
     }
 
     if (pin.trim() !== mockSession.pin) {
-      setJoinMessage("PIN 码不正确，请检查老师分享的课堂码。");
+      setJoinMessage("课堂 PIN 不正确，请向老师确认");
       return;
     }
 
@@ -72,7 +72,10 @@ export function StudentJoin({ onNavigate }: StudentJoinProps) {
               </div>
 
               {!joined ? (
-                <div className="space-y-4 rounded-3xl bg-white/92 p-5 shadow-xl">
+                <form className="space-y-4 rounded-3xl bg-white/92 p-5 shadow-xl" onSubmit={(event) => {
+                  event.preventDefault();
+                  joinClass();
+                }}>
                   <label className="block">
                     <span className="mb-2 block text-sm font-black text-slate-600">输入昵称</span>
                     <input
@@ -94,17 +97,20 @@ export function StudentJoin({ onNavigate }: StudentJoinProps) {
                     />
                   </label>
                   <Button
+                    type="submit"
                     fullWidth
                     size="lg"
                     variant="sun"
-                    onClick={joinClass}
                   >
                     立即加入
                   </Button>
+                  <p className="text-sm font-bold leading-6 text-slate-700">
+                    课游小熊提醒：同学们请使用昵称加入课堂，不要填写手机号、家庭住址等个人信息。
+                  </p>
                   <p className="rounded-2xl bg-blue-50 p-3 text-sm font-black text-slate-600">
                     {joinMessage}
                   </p>
-                </div>
+                </form>
               ) : (
                 <div className="rounded-3xl bg-white/94 p-5 text-center shadow-xl">
                   <div className="text-5xl">🎉</div>

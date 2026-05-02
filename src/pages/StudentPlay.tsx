@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DragClassifyGame } from "../components/DragClassifyGame";
@@ -21,9 +21,11 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
   const [stars, setStars] = useState(0);
   const [coins, setCoins] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [largeMode, setLargeMode] = useState(false);
   const rewardedLevelRef = useRef<Set<number>>(new Set());
   const activeScene = activeLevel === null ? null : activeLesson.scenes[activeLevel];
   const activeQuestion = activeScene?.questions[0];
+  const loadFailed = activeLesson.scenes.length === 0;
   const mapLevels = activeLesson.scenes.map((scene, index) => ({
     id: scene.id,
     name: scene.title,
@@ -54,26 +56,53 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
     setActiveLevel(activeLevel + 1);
   };
 
+  useEffect(() => {
+    document.body.classList.toggle("keyou-bigscreen", largeMode);
+    return () => document.body.classList.remove("keyou-bigscreen");
+  }, [largeMode]);
+
+  if (loadFailed) {
+    return (
+      <div className="rounded-3xl bg-white/88 p-6 text-center shadow-xl">
+        <h1 className="text-3xl font-black text-ink">课件加载失败，请检查链接或联系老师</h1>
+        <div className="mt-5 flex flex-wrap justify-center gap-3">
+          <Button size="lg" onClick={() => window.location.reload()}>重新加载</Button>
+          <Button size="lg" variant="white" onClick={() => onNavigate("student")}>返回学生加入页</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className={["student-play-page space-y-6", largeMode ? "student-play-large" : ""].join(" ")}>
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-skybrand sm:text-6xl">学生端游戏课件页</h1>
+          <h1 className="text-4xl font-black text-skybrand sm:text-6xl">互动闯关课堂</h1>
           <p className="mt-3 text-xl font-bold text-ink">
             {activeLesson.title}
           </p>
         </div>
-        <Card className="p-4">
-          <div className="flex items-center gap-4">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-sky-200 to-yellow-100 text-3xl">
-              🧒
-            </span>
-            <div>
-              <p className="text-sm font-bold text-slate-500">昵称：小星星</p>
-              <p className="text-lg font-black text-ink">⭐ {stars} · 🪙 {coins}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant={largeMode ? "sun" : "white"}
+            size="lg"
+            onClick={() => setLargeMode((value) => !value)}
+            aria-pressed={largeMode}
+          >
+            {largeMode ? "退出大屏模式" : "大屏模式"}
+          </Button>
+          <Card className="p-4">
+            <div className="flex items-center gap-4">
+              <span className="flex h-14 w-14 select-none items-center justify-center rounded-full bg-gradient-to-br from-sky-200 to-yellow-100 text-3xl" aria-hidden="true">
+                🧒
+              </span>
+              <div>
+                <p className="text-sm font-bold text-slate-700">昵称：小星星</p>
+                <p className="text-lg font-black text-ink">⭐ {stars} · 🪙 {coins}</p>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </section>
 
       <Card className="p-4">
@@ -147,7 +176,7 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
         ].map(([title, text, icon]) => (
           <Card key={title} className="p-4">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{icon}</span>
+              <span className="select-none text-3xl" aria-hidden="true">{icon}</span>
               <div>
                 <p className="font-black text-ink">{title}</p>
                 <p className="text-sm font-bold text-slate-500">{text}</p>
