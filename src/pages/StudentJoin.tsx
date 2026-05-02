@@ -7,9 +7,10 @@ import type { AppRoute } from "../data/routes";
 
 type StudentJoinProps = {
   onNavigate: (route: AppRoute) => void;
+  onJoinStudent: (nickname: string) => void;
 };
 
-export function StudentJoin({ onNavigate }: StudentJoinProps) {
+export function StudentJoin({ onNavigate, onJoinStudent }: StudentJoinProps) {
   const [nickname, setNickname] = useState("小星星");
   const [pin, setPin] = useState(mockSession.pin);
   const [joined, setJoined] = useState(false);
@@ -27,6 +28,7 @@ export function StudentJoin({ onNavigate }: StudentJoinProps) {
     }
 
     setJoinMessage("加入成功，准备开始闯关。");
+    onJoinStudent(nickname);
     setJoined(true);
   };
 

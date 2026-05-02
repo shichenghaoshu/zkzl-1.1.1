@@ -16,8 +16,16 @@ import {
   type MockDatabase,
   type TenantRecord
 } from "./data/mockDatabase";
+import { mockClass, mockSession } from "./data/mockClassData";
+import {
+  createLiveClassReport,
+  ensureLiveClassReport,
+  recordLevelAnswer,
+  recordStudentJoin,
+  type LiveClassReport
+} from "./data/liveClassReport";
 import { pathToRoute, routePaths, type AppRoute } from "./data/routes";
-import type { Lesson } from "./data/mockLessons";
+import { mockLesson, type Lesson } from "./data/mockLessons";
 import { AuthPage } from "./pages/AuthPage";
 import { BackendConsole } from "./pages/BackendConsole";
 import { ClassReport } from "./pages/ClassReport";
@@ -70,10 +78,17 @@ function setMeta(name: string, content: string, attribute: "name" | "property" =
 
 const accountStoreKey = "keyou-account-store";
 const generatedLessonKey = "keyou-generated-lesson";
+const liveClassReportKey = "keyou-live-class-report";
+const activeStudentKey = "keyou-active-student";
 
 type StoredAccountRecord = {
   user: AuthUser;
   usage: UsageAccount;
+};
+
+type ActiveStudent = {
+  id: string;
+  name: string;
 };
 
 export default function App() {
@@ -94,7 +109,14 @@ export default function App() {
   const [generatedLesson, setGeneratedLesson] = useState<Lesson | null>(() =>
     readStoredJson<Lesson>(generatedLessonKey)
   );
+  const [liveClassReport, setLiveClassReport] = useState<LiveClassReport | null>(() =>
+    readStoredJson<LiveClassReport>(liveClassReportKey)
+  );
+  const [activeStudent, setActiveStudent] = useState<ActiveStudent | null>(() =>
+    readStoredJson<ActiveStudent>(activeStudentKey)
+  );
   const [studentReportUnlocked, setStudentReportUnlocked] = useState(false);
+  const activeLesson = generatedLesson ?? mockLesson;
 
   const navigate = useCallback((nextRoute: AppRoute) => {
     setRoute(nextRoute);
@@ -198,6 +220,26 @@ export default function App() {
       window.localStorage.setItem(generatedLessonKey, JSON.stringify(generatedLesson));
     }
   }, [generatedLesson]);
+
+  useEffect(() => {
+    setLiveClassReport((current) =>
+      ensureLiveClassReport(current, activeLesson, mockClass, mockSession)
+    );
+  }, [activeLesson]);
+
+  useEffect(() => {
+    if (liveClassReport) {
+      window.localStorage.setItem(liveClassReportKey, JSON.stringify(liveClassReport));
+    }
+  }, [liveClassReport]);
+
+  useEffect(() => {
+    if (activeStudent) {
+      window.localStorage.setItem(activeStudentKey, JSON.stringify(activeStudent));
+    } else {
+      window.localStorage.removeItem(activeStudentKey);
+    }
+  }, [activeStudent]);
 
   const login = (user: AuthUser, usage: UsageAccount, nextRoute: AppRoute) => {
     const accountKey = user.inviteCode.toUpperCase();
@@ -321,6 +363,47 @@ export default function App() {
     });
   };
 
+  const handleGeneratedLesson = (lesson: Lesson) => {
+    setGeneratedLesson(lesson);
+    setLiveClassReport(createLiveClassReport(lesson, mockClass, mockSession));
+    setActiveStudent(null);
+  };
+
+  const joinStudent = (nickname: string) => {
+    const result = recordStudentJoin(
+      ensureLiveClassReport(liveClassReport, activeLesson, mockClass, mockSession),
+      nickname
+    );
+    const studentName =
+      result.report.students.find((student) => student.id === result.studentId)?.name || "同学";
+    setLiveClassReport(result.report);
+    setActiveStudent({ id: result.studentId, name: studentName });
+  };
+
+  const recordStudentAnswer = (levelIndex: number, correct: boolean, stars: number) => {
+    let baseReport = ensureLiveClassReport(liveClassReport, activeLesson, mockClass, mockSession);
+    let student = activeStudent;
+
+    if (!student) {
+      const joined = recordStudentJoin(baseReport, "小星星");
+      const studentName =
+        joined.report.students.find((item) => item.id === joined.studentId)?.name || "小星星";
+      baseReport = joined.report;
+      student = { id: joined.studentId, name: studentName };
+      setActiveStudent(student);
+    }
+
+    setLiveClassReport(
+      recordLevelAnswer(baseReport, {
+        studentId: student.id,
+        studentName: student.name,
+        levelIndex,
+        correct,
+        stars
+      })
+    );
+  };
+
   const openStudentReport = () => {
     setStudentReportUnlocked(true);
     navigate("report");
@@ -362,7 +445,7 @@ export default function App() {
           usage={usageAccount}
           apiProviders={opsDatabase.apiProviders}
           onConsumeGeneration={consumeGeneration}
-          onGeneratedLesson={setGeneratedLesson}
+          onGeneratedLesson={handleGeneratedLesson}
           onNavigate={navigate}
         />
       ) : null}
@@ -370,11 +453,19 @@ export default function App() {
         <LessonEditor lesson={generatedLesson} onUpdateLesson={setGeneratedLesson} onNavigate={navigate} />
       ) : null}
       {!needsAuth && route === "share" ? <ShareLesson lesson={generatedLesson} onNavigate={navigate} /> : null}
-      {route === "student" ? <StudentJoin onNavigate={navigate} /> : null}
+      {route === "student" ? <StudentJoin onNavigate={navigate} onJoinStudent={joinStudent} /> : null}
       {route === "play" ? (
-        <StudentPlay lesson={generatedLesson} onNavigate={navigate} onViewReport={openStudentReport} />
+        <StudentPlay
+          lesson={generatedLesson}
+          student={activeStudent}
+          onNavigate={navigate}
+          onRecordAnswer={recordStudentAnswer}
+          onViewReport={openStudentReport}
+        />
       ) : null}
-      {!needsAuth && route === "report" ? <ClassReport /> : null}
+      {!needsAuth && route === "report" ? (
+        <ClassReport report={ensureLiveClassReport(liveClassReport, activeLesson, mockClass, mockSession)} />
+      ) : null}
       {!needsAuth && route === "backend" ? (
         <BackendConsole
           user={authUser}

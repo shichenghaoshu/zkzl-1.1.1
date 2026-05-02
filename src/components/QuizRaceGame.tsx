@@ -9,6 +9,7 @@ type QuizRaceGameProps = {
     answer: string;
     explanation?: string;
   };
+  onAnswer?: (option: string, correct: boolean) => void;
   onSuccess?: () => void;
   onNext?: () => void;
 };
@@ -16,7 +17,7 @@ type QuizRaceGameProps = {
 const options = ["A. 1/2", "B. 2/3", "C. 3/4", "D. 1/3"];
 const correctAnswer = "C. 3/4";
 
-export function QuizRaceGame({ config, onSuccess, onNext }: QuizRaceGameProps) {
+export function QuizRaceGame({ config, onAnswer, onSuccess, onNext }: QuizRaceGameProps) {
   const activeOptions = config?.options.length ? config.options : options;
   const activeAnswer = config?.answer || correctAnswer;
   const activePrompt = config?.prompt || "下面哪个分数最大？";
@@ -26,6 +27,7 @@ export function QuizRaceGame({ config, onSuccess, onNext }: QuizRaceGameProps) {
 
   const choose = (option: string) => {
     setSelected(option);
+    onAnswer?.(option, option === activeAnswer);
     if (option === activeAnswer && !hasSucceeded) {
       setHasSucceeded(true);
       onSuccess?.();

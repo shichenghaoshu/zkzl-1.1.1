@@ -47,7 +47,7 @@ export function DragClassifyGame({ mode = "editor", config: customConfig, onComp
   const config = customConfig ?? configs[mode];
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [placements, setPlacements] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState("先点一个分数，再点分类框，就像拖拽一样。");
+  const [feedback, setFeedback] = useState("先点一个选项，再点正确选项框，就像拖拽一样。");
   const [completed, setCompleted] = useState(false);
 
   const grouped = useMemo(
@@ -74,7 +74,7 @@ export function DragClassifyGame({ mode = "editor", config: customConfig, onComp
 
   const placeItem = (category: string) => {
     if (!selectedItem) {
-      setFeedback("先选择一个分数卡片哦。");
+      setFeedback("先选择一个选项卡片哦。");
       return;
     }
 
@@ -92,7 +92,7 @@ export function DragClassifyGame({ mode = "editor", config: customConfig, onComp
     setSelectedItem(null);
     setPlacements({});
     setCompleted(false);
-    setFeedback("先点一个分数，再点分类框，就像拖拽一样。");
+    setFeedback("先点一个选项，再点正确选项框，就像拖拽一样。");
   };
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export function DragClassifyGame({ mode = "editor", config: customConfig, onComp
               onClick={() => placeItem(category)}
               className={[
                 "min-h-36 rounded-3xl border-4 border-dashed bg-white/88 p-4 text-left shadow-lg transition-all hover:-translate-y-1",
-                category.includes("真") || category.includes("二")
+                category.includes("真") || category.includes("二") || category.includes("正确")
                   ? "border-mintbrand"
                   : "border-coralbrand"
               ].join(" ")}
@@ -142,7 +142,7 @@ export function DragClassifyGame({ mode = "editor", config: customConfig, onComp
                 <span
                   className={[
                     "rounded-2xl px-4 py-2 text-lg font-black text-white",
-                    category.includes("真") || category.includes("二")
+                    category.includes("真") || category.includes("二") || category.includes("正确")
                       ? "bg-mintbrand"
                       : "bg-coralbrand"
                   ].join(" ")}
@@ -162,7 +162,7 @@ export function DragClassifyGame({ mode = "editor", config: customConfig, onComp
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm font-bold text-slate-400">点击这里放入分数</span>
+                  <span className="text-sm font-bold text-slate-500">点击这里放入正确选项</span>
                 )}
               </div>
             </button>

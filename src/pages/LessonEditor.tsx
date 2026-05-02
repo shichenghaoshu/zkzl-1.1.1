@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DragClassifyGame } from "../components/DragClassifyGame";
+import { getAnswerOnlyItems } from "../data/liveClassReport";
 import { mockLesson, type Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
 
@@ -33,14 +34,14 @@ export function LessonEditor({ lesson, onUpdateLesson, onNavigate }: LessonEdito
   );
   const totalStars = activeLesson.scenes.reduce((sum, scene) => sum + scene.rewards.stars, 0);
   const previewConfig = useMemo(() => {
-    const options = firstQuestion?.options?.length ? firstQuestion.options : ["选项 A", "选项 B", "选项 C"];
-    const categories = ["正确答案", "其他选项"];
+    const answerItems = getAnswerOnlyItems(firstQuestion);
+    const categories = ["正确选项"];
     return {
       prompt: firstQuestion?.prompt || selectedScene?.description || "编辑题目后可在这里预览。",
       categories,
-      items: options,
-      answerMap: options.reduce<Record<string, string>>((acc, option) => {
-        acc[option] = option === firstQuestion?.answer ? "正确答案" : "其他选项";
+      items: answerItems,
+      answerMap: answerItems.reduce<Record<string, string>>((acc, option) => {
+        acc[option] = "正确选项";
         return acc;
       }, {})
     };

@@ -2,6 +2,7 @@ type ProgressBarProps = {
   value: number;
   label?: string;
   color?: "blue" | "mint" | "sun" | "violet" | "coral";
+  animated?: boolean;
 };
 
 const colors = {
@@ -12,7 +13,7 @@ const colors = {
   coral: "from-coralbrand to-pink-400"
 };
 
-export function ProgressBar({ value, label, color = "blue" }: ProgressBarProps) {
+export function ProgressBar({ value, label, color = "blue", animated = false }: ProgressBarProps) {
   const safeValue = Math.max(0, Math.min(100, value));
 
   return (
@@ -25,7 +26,11 @@ export function ProgressBar({ value, label, color = "blue" }: ProgressBarProps) 
       ) : null}
       <div className="h-3 overflow-hidden rounded-full bg-blue-100">
         <div
-          className={`h-full rounded-full bg-gradient-to-r ${colors[color]} transition-all duration-500 bar-shine`}
+          className={[
+            "h-full rounded-full bg-gradient-to-r transition-all duration-500 bar-shine",
+            animated ? "progress-fill--animated" : "",
+            colors[color]
+          ].join(" ")}
           style={{ width: `${safeValue}%` }}
         />
       </div>

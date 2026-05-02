@@ -4,6 +4,8 @@ export type Student = {
   score: number;
   stars: number;
   progress: number;
+  answers?: number;
+  correctAnswers?: number;
 };
 
 export type Class = {

@@ -6,6 +6,7 @@ import { QRCodeMock } from "../components/QRCodeMock";
 import { mockClass, mockSession } from "../data/mockClassData";
 import { mockLesson, type Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
+import { downloadQrSvg } from "../services/qrCode";
 
 type ShareLessonProps = {
   lesson: Lesson | null;
@@ -15,11 +16,27 @@ type ShareLessonProps = {
 export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
   const [copied, setCopied] = useState("尚未复制");
   const [published, setPublished] = useState(false);
+  const [qrDownloading, setQrDownloading] = useState(false);
   const activeLesson = lesson ?? mockLesson;
   const shareUrl = `https://savegpa.online/play?lesson=${activeLesson.id.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "abc123"}`;
 
-  const markCopied = (text: string) => {
+  const markCopied = async (text: string, value?: string) => {
+    if (value) {
+      await copyText(value);
+    }
     setCopied(text);
+  };
+
+  const downloadQr = async () => {
+    try {
+      setQrDownloading(true);
+      await downloadQrSvg(shareUrl, activeLesson.title);
+      setCopied("二维码已下载，可直接发到微信群或投到大屏。");
+    } catch {
+      setCopied("二维码下载失败，请先复制课堂链接发给学生。");
+    } finally {
+      setQrDownloading(false);
+    }
   };
 
   return (
@@ -55,18 +72,18 @@ export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
               <p className="mt-3 break-all rounded-2xl bg-white px-3 py-3 text-sm font-bold text-skybrand">
                 {shareUrl}
               </p>
-              <Button className="mt-4" variant="secondary" onClick={() => markCopied("链接已复制")}>
+              <Button className="mt-4" variant="secondary" onClick={() => void markCopied("链接已复制", shareUrl)}>
                 复制
               </Button>
             </Card>
 
             <Card tone="mint" className="p-5 text-center">
               <div className="mx-auto flex justify-center">
-                <QRCodeMock />
+                <QRCodeMock value={shareUrl} title={`${activeLesson.title}课堂二维码`} />
               </div>
               <h3 className="mt-4 text-xl font-black text-ink">下载二维码</h3>
-              <Button className="mt-4" variant="mint" onClick={() => markCopied("二维码已准备下载")}>
-                下载保存
+              <Button className="mt-4" variant="mint" onClick={() => void downloadQr()} disabled={qrDownloading}>
+                {qrDownloading ? "正在生成" : "下载保存"}
               </Button>
             </Card>
 
@@ -78,7 +95,7 @@ export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
               <p className="mt-3 rounded-3xl bg-white px-4 py-4 text-4xl font-black tracking-[0.18em] text-violetbrand shadow-inner">
                 {mockSession.pin}
               </p>
-              <Button className="mt-4" variant="white" onClick={() => markCopied("PIN 码已复制")}>
+              <Button className="mt-4" variant="white" onClick={() => void markCopied("PIN 码已复制", mockSession.pin)}>
                 复制 PIN 码
               </Button>
             </Card>
@@ -96,7 +113,7 @@ export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
               size="lg"
               onClick={() => {
                 setPublished(true);
-                markCopied("已发布到三年级2班");
+                void markCopied("已发布到三年级2班");
               }}
             >
               🚀 班级发布
@@ -144,4 +161,20 @@ export function ShareLesson({ lesson, onNavigate }: ShareLessonProps) {
       </div>
     </div>
   );
+}
+
+async function copyText(value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const input = document.createElement("textarea");
+    input.value = value;
+    input.setAttribute("readonly", "true");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    input.remove();
+  }
 }

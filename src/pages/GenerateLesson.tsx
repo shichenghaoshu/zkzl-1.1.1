@@ -262,7 +262,18 @@ export function GenerateLesson({
             <h2 className="mt-4 text-3xl font-black text-skybrand">正在生成游戏课件</h2>
             <p className="mt-2 text-lg font-bold text-ink">{stages[stageIndex]}</p>
             <div className="mt-6">
-              <ProgressBar value={progress} label="生成进度" color="mint" />
+              <ProgressBar value={progress} label="生成进度" color="mint" animated />
+            </div>
+            <div className="mt-4 grid grid-cols-4 gap-2" aria-hidden="true">
+              {stages.map((stage, index) => (
+                <span
+                  key={stage}
+                  className={[
+                    "h-2 rounded-full transition-all",
+                    index <= stageIndex ? "bg-mintbrand" : "bg-blue-100"
+                  ].join(" ")}
+                />
+              ))}
             </div>
             <div className="mt-5 flex justify-center gap-3 text-3xl">
               <span className="animate-pulse-star">⭐</span>

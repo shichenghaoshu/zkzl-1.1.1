@@ -5,16 +5,19 @@ import { DragClassifyGame } from "../components/DragClassifyGame";
 import { GameMap } from "../components/GameMap";
 import { ProgressBar } from "../components/ProgressBar";
 import { QuizRaceGame } from "../components/QuizRaceGame";
+import { getAnswerOnlyItems } from "../data/liveClassReport";
 import { mockLesson, type Lesson, type Question, type Scene } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
 
 type StudentPlayProps = {
   lesson: Lesson | null;
+  student: { id: string; name: string } | null;
   onNavigate: (route: AppRoute) => void;
+  onRecordAnswer: (levelIndex: number, correct: boolean, stars: number) => void;
   onViewReport: () => void;
 };
 
-export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayProps) {
+export function StudentPlay({ lesson, student, onNavigate, onRecordAnswer, onViewReport }: StudentPlayProps) {
   const activeLesson = lesson ?? mockLesson;
   const levelCount = activeLesson.scenes.length;
   const [activeLevel, setActiveLevel] = useState<number | null>(null);
@@ -42,9 +45,11 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
     if (activeLevel === null || rewardedLevelRef.current.has(activeLevel)) return;
 
     rewardedLevelRef.current.add(activeLevel);
-    setStars((value) => value + (activeScene?.rewards.stars ?? 3));
+    const earnedStars = activeScene?.rewards.stars ?? 3;
+    setStars((value) => value + earnedStars);
     setCoins((value) => value + (activeScene?.rewards.coins ?? 20));
     setProgress((value) => Math.min(levelCount, Math.max(value, activeLevel + 1)));
+    onRecordAnswer(activeLevel, true, earnedStars);
   };
 
   const nextLevel = () => {
@@ -97,7 +102,7 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
                 🧒
               </span>
               <div>
-                <p className="text-sm font-bold text-slate-700">昵称：小星星</p>
+                <p className="text-sm font-bold text-slate-700">昵称：{student?.name ?? "小星星"}</p>
                 <p className="text-lg font-black text-ink">⭐ {stars} · 🪙 {coins}</p>
               </div>
             </div>
@@ -132,6 +137,9 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
               <QuizRaceGame
                 key={activeLevel}
                 config={buildQuizConfig(activeQuestion)}
+                onAnswer={(_, correct) => {
+                  if (!correct) onRecordAnswer(activeLevel, false, 0);
+                }}
                 onSuccess={reward}
                 onNext={nextLevel}
               />
@@ -190,14 +198,13 @@ export function StudentPlay({ lesson, onNavigate, onViewReport }: StudentPlayPro
 }
 
 function buildDragConfig(scene: Scene | null | undefined, question: Question | undefined) {
-  const options = question?.options.length ? question.options : ["选项 A", "选项 B", "选项 C"];
-  const answer = question?.answer && options.includes(question.answer) ? question.answer : options[0];
+  const answerItems = getAnswerOnlyItems(question);
   return {
     prompt: question?.prompt || scene?.description || "请选择正确答案。",
-    categories: ["正确答案", "其他选项"],
-    items: options,
-    answerMap: options.reduce<Record<string, string>>((acc, option) => {
-      acc[option] = option === answer ? "正确答案" : "其他选项";
+    categories: ["正确选项"],
+    items: answerItems,
+    answerMap: answerItems.reduce<Record<string, string>>((acc, option) => {
+      acc[option] = "正确选项";
       return acc;
     }, {})
   };
