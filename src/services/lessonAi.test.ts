@@ -209,6 +209,35 @@ describe("lesson AI generation", () => {
     );
   });
 
+  it("preserves flashcard, ordering, and memory scene types from AI response", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        lesson: {
+          id: "lesson-new-types",
+          title: "新关卡类型课",
+          grade: "小学中段",
+          subject: "数学",
+          gameMode: "闯关地图",
+          scenes: [
+            { id: "s1", type: "flashcard", title: "翻卡", description: "d", questions: [{ id: "q1", prompt: "p", options: ["a", "b"], answer: "a" }], rewards: { stars: 1, coins: 10 } },
+            { id: "s2", type: "ordering", title: "排序", description: "d", questions: [{ id: "q2", prompt: "p", options: ["a", "b"], answer: "a" }], rewards: { stars: 2, coins: 15 } },
+            { id: "s3", type: "memory", title: "记忆", description: "d", questions: [{ id: "q3", prompt: "p", options: ["a", "b"], answer: "a" }], rewards: { stars: 3, coins: 20 } }
+          ]
+        },
+        message: "已生成课件。"
+      })
+    });
+
+    const result = await generateLessonWithAi(input, [baseProvider], fetchImpl);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.lesson.scenes[0].type).toBe("flashcard");
+    expect(result.lesson.scenes[1].type).toBe("ordering");
+    expect(result.lesson.scenes[2].type).toBe("memory");
+  });
+
   it("explains 401 generation failures as an expired AI session instead of an Ops config issue", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: false,

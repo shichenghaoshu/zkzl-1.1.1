@@ -30,7 +30,7 @@ type ResponseLike = {
   text?: () => Promise<string>;
 };
 
-const sceneTypes: Scene["type"][] = ["story", "drag-classify", "match", "quiz-race", "boss"];
+const sceneTypes: Scene["type"][] = ["story", "drag-classify", "match", "quiz-race", "boss", "flashcard", "ordering", "memory"];
 
 export function getAiProviderStatus(providers: ApiProviderConfig[]): AiProviderStatus {
   const enabledProviders = providers.filter((provider) => provider.enabled);

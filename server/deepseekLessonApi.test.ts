@@ -81,6 +81,54 @@ describe("DeepSeek lesson API proxy", () => {
     expect(JSON.stringify(requestBody.messages)).toContain("三年级数学：认识分数");
   });
 
+  it("prompt includes flashcard, ordering, and memory scene types", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ title: "t", scenes: [{ title: "s", questions: [{ prompt: "q", answer: "a" }] }] }) } }]
+      })
+    });
+
+    await generateLessonViaDeepSeek(input, provider, fetchImpl);
+    const messages = JSON.parse(fetchImpl.mock.calls[0][1].body as string).messages;
+    const promptText = messages.map((m: { content: string }) => m.content).join("\n");
+    expect(promptText).toContain("flashcard");
+    expect(promptText).toContain("ordering");
+    expect(promptText).toContain("memory");
+  });
+
+  it("normalizes flashcard, ordering, and memory scene types from DeepSeek response", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                title: "新关卡类型课",
+                grade: "小学中段",
+                subject: "数学",
+                gameMode: "闯关地图",
+                scenes: [
+                  { type: "flashcard", title: "翻卡", questions: [{ prompt: "q1", options: ["a", "b"], answer: "a" }], rewards: { stars: 1, coins: 10 } },
+                  { type: "ordering", title: "排序", questions: [{ prompt: "q2", options: ["a", "b"], answer: "a" }], rewards: { stars: 2, coins: 15 } },
+                  { type: "memory", title: "记忆", questions: [{ prompt: "q3", options: ["a", "b"], answer: "a" }], rewards: { stars: 3, coins: 20 } }
+                ]
+              })
+            }
+          }
+        ]
+      })
+    });
+
+    const result = await generateLessonViaDeepSeek(input, provider, fetchImpl);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.lesson.scenes[0].type).toBe("flashcard");
+    expect(result.lesson.scenes[1].type).toBe("ordering");
+    expect(result.lesson.scenes[2].type).toBe("memory");
+  });
+
   it("rejects non-DeepSeek outbound base URLs", async () => {
     const fetchImpl = vi.fn();
     const result = await generateLessonViaDeepSeek(

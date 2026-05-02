@@ -2,9 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DragClassifyGame } from "../components/DragClassifyGame";
+import { FlashcardGame } from "../components/FlashcardGame";
+import { MatchGame } from "../components/MatchGame";
+import { MemoryGame } from "../components/MemoryGame";
+import { OrderingGame } from "../components/OrderingGame";
+import { QuizRaceGame } from "../components/QuizRaceGame";
 import { getAnswerOnlyItems } from "../data/liveClassReport";
 import { mockLesson, type Lesson } from "../data/mockLessons";
 import type { AppRoute } from "../data/routes";
+import type { Question, Scene } from "../data/mockLessons";
 
 type LessonEditorProps = {
   lesson: Lesson | null;
@@ -191,11 +197,7 @@ export function LessonEditor({ lesson, onUpdateLesson, onNavigate }: LessonEdito
             />
           </div>
 
-          <DragClassifyGame
-            mode="editor"
-            config={previewConfig}
-            onComplete={() => setNotice("学生答对后会显示星星奖励，课堂参与数据同步进入报告。")}
-          />
+          {renderEditorPreview(selectedScene, firstQuestion, previewConfig, () => setNotice("学生答对后会显示星星奖励，课堂参与数据同步进入报告。"))}
 
           <div className="mt-4 flex flex-wrap justify-center gap-2 rounded-3xl bg-white/80 p-3 shadow-inner">
             {["🖱️", "T", "🖼️", "🎵", "⭐", "↩", "↪"].map((tool) => (
@@ -321,4 +323,98 @@ export function LessonEditor({ lesson, onUpdateLesson, onNavigate }: LessonEdito
       </Card>
     </div>
   );
+}
+
+function renderEditorPreview(
+  scene: Scene | undefined,
+  question: Question | undefined,
+  previewConfig: { prompt: string; categories: string[]; items: string[]; answerMap: Record<string, string> },
+  onComplete: () => void
+) {
+  if (!scene) return null;
+
+  switch (scene.type) {
+    case "flashcard":
+      return (
+        <FlashcardGame
+          key={scene.id}
+          config={{
+            prompt: scene.description,
+            cards: scene.questions.length
+              ? scene.questions.map((q) => ({ front: q.prompt, back: q.answer + (q.explanation ? `。${q.explanation}` : "") }))
+              : [{ front: scene.title, back: scene.description }]
+          }}
+          onComplete={onComplete}
+        />
+      );
+    case "ordering":
+      return (
+        <OrderingGame
+          key={scene.id}
+          config={{
+            prompt: question?.prompt || scene.description || "把选项按正确顺序排列。",
+            items: question?.options.length ? question.options : ["1/4", "1/2", "3/4", "1"],
+            correctOrder: question?.answer ? question.answer.split(",").map((s) => s.trim()) : ["1/4", "1/2", "3/4", "1"]
+          }}
+          onComplete={onComplete}
+        />
+      );
+    case "memory":
+      return (
+        <MemoryGame
+          key={scene.id}
+          config={{
+            prompt: question?.prompt || scene.description || "翻开两张卡片，找到配对的一组。",
+            pairs: question?.options.length
+              ? question.options.map((opt) => { const p = opt.split(":"); return { left: p[0]?.trim() || opt, right: p[1]?.trim() || opt }; })
+              : [{ left: "1/2", right: "50%" }, { left: "3/4", right: "75%" }]
+          }}
+          onComplete={onComplete}
+        />
+      );
+    case "match":
+      return (
+        <MatchGame
+          key={scene.id}
+          config={{
+            prompt: question?.prompt || scene.description || "把对应的选项配对。",
+            pairs: question?.options.length
+              ? question.options.map((opt) => { const p = opt.split(":"); return { left: p[0]?.trim() || opt, right: p[1]?.trim() || opt }; })
+              : [{ left: "1/2", right: "二分之一" }, { left: "3/4", right: "四分之三" }]
+          }}
+          onComplete={onComplete}
+        />
+      );
+    case "story":
+      return (
+        <Card key={scene.id} className="p-6 text-center">
+          <div className="text-6xl mb-4">📖</div>
+          <h3 className="text-3xl font-black text-ink">{scene.title}</h3>
+          <p className="mt-3 text-lg font-bold text-slate-600">{scene.description}</p>
+        </Card>
+      );
+    case "quiz-race":
+    case "boss":
+      return (
+        <QuizRaceGame
+          key={scene.id}
+          config={{
+            prompt: question?.prompt || "请选择正确答案。",
+            options: question?.options.length ? question.options : ["A", "B", "C", "D"],
+            answer: question?.answer || question?.options[0] || "A",
+            explanation: question?.explanation
+          }}
+          onSuccess={onComplete}
+        />
+      );
+    default:
+      return (
+        <DragClassifyGame
+          key={scene.id}
+          mode="editor"
+          config={previewConfig}
+          onComplete={onComplete}
+        />
+      );
+  }
 }

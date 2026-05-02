@@ -25,7 +25,7 @@ type ApiResult =
   | { ok: true; lesson: Lesson; message: string }
   | { ok: false; message: string };
 
-const sceneTypes: Scene["type"][] = ["story", "drag-classify", "match", "quiz-race", "boss"];
+const sceneTypes: Scene["type"][] = ["story", "drag-classify", "match", "quiz-race", "boss", "flashcard", "ordering", "memory"];
 const configPath = resolve(process.cwd(), ".keyou-ai-provider.local.json");
 const sessions = new Map<string, { role: "teacher" | "admin"; createdAt: number }>();
 const sessionTtlMs = 1000 * 60 * 60 * 8;

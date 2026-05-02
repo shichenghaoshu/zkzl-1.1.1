@@ -93,6 +93,10 @@ type ActiveStudent = {
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(getInitialRoute);
+  const [pendingRoute, setPendingRoute] = useState<AppRoute>(() => {
+    const initialRoute = getInitialRoute();
+    return protectedRoutes.has(initialRoute) ? initialRoute : "teacher-dashboard";
+  });
   const [authUser, setAuthUser] = useState<AuthUser | null>(() =>
     readStoredJson<AuthUser>("keyou-auth-user")
   );
@@ -119,19 +123,37 @@ export default function App() {
   const activeLesson = generatedLesson ?? mockLesson;
 
   const navigate = useCallback((nextRoute: AppRoute) => {
-    setRoute(nextRoute);
-    const nextPath = routePaths[nextRoute];
+    const routeNeedsLogin = protectedRoutes.has(nextRoute) && !(nextRoute === "report" && studentReportUnlocked);
+    const visibleRoute = routeNeedsLogin && !authUser ? "login" : nextRoute;
+
+    if (visibleRoute === "login" && nextRoute !== "login") {
+      setPendingRoute(nextRoute);
+    }
+
+    setRoute(visibleRoute);
+    const nextPath = routePaths[visibleRoute];
     if (window.location.pathname !== nextPath) {
-      window.history.pushState({ route: nextRoute }, "", nextPath);
+      window.history.pushState({ route: visibleRoute }, "", nextPath);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [authUser, studentReportUnlocked]);
 
   useEffect(() => {
     const onPopState = () => setRoute(getInitialRoute());
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    const routeNeedsLogin = protectedRoutes.has(route) && !(route === "report" && studentReportUnlocked);
+    if (!routeNeedsLogin || authUser) return;
+
+    setPendingRoute(route);
+    setRoute("login");
+    if (window.location.pathname !== routePaths.login) {
+      window.history.replaceState({ route: "login" }, "", routePaths.login);
+    }
+  }, [authUser, route, studentReportUnlocked]);
 
   useEffect(() => {
     const titles: Record<AppRoute, string> = {
@@ -262,7 +284,12 @@ export default function App() {
         usage: nextUsage
       }
     }));
-    navigate(nextRoute);
+    setRoute(nextRoute);
+    const nextPath = routePaths[nextRoute];
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({ route: nextRoute }, "", nextPath);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const logout = () => {
@@ -406,40 +433,30 @@ export default function App() {
 
   const openStudentReport = () => {
     setStudentReportUnlocked(true);
-    navigate("report");
+    setRoute("report");
+    if (window.location.pathname !== routePaths.report) {
+      window.history.pushState({ route: "report" }, "", routePaths.report);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const routeRequiresAuth = protectedRoutes.has(route) && !(route === "report" && studentReportUnlocked);
-  const needsAuth = routeRequiresAuth && !authUser;
 
   return (
     <Layout activeRoute={route} onNavigate={navigate} user={authUser} usage={usageAccount} onLogout={logout}>
-      {needsAuth ? (
+      {route === "login" ? (
         <AuthPage
           currentUser={authUser}
           usage={usageAccount}
-          redirectRoute={route}
+          redirectRoute={pendingRoute}
           onLogin={login}
           onLogout={logout}
           onNavigate={navigate}
           inviteCodes={opsDatabase.inviteCodes}
         />
       ) : null}
-      {!needsAuth && route === "login" ? (
-        <AuthPage
-          currentUser={authUser}
-          usage={usageAccount}
-          redirectRoute="teacher-dashboard"
-          onLogin={login}
-          onLogout={logout}
-          onNavigate={navigate}
-          inviteCodes={opsDatabase.inviteCodes}
-        />
-      ) : null}
-      {!needsAuth && route === "teacher-dashboard" ? (
+      {route === "teacher-dashboard" ? (
         <TeacherDashboard user={authUser} usage={usageAccount} onNavigate={navigate} />
       ) : null}
-      {!needsAuth && route === "generate" && usageAccount ? (
+      {route === "generate" && usageAccount ? (
         <GenerateLesson
           user={authUser}
           usage={usageAccount}
@@ -449,10 +466,10 @@ export default function App() {
           onNavigate={navigate}
         />
       ) : null}
-      {!needsAuth && route === "editor" ? (
+      {route === "editor" ? (
         <LessonEditor lesson={generatedLesson} onUpdateLesson={setGeneratedLesson} onNavigate={navigate} />
       ) : null}
-      {!needsAuth && route === "share" ? <ShareLesson lesson={generatedLesson} onNavigate={navigate} /> : null}
+      {route === "share" ? <ShareLesson lesson={generatedLesson} onNavigate={navigate} /> : null}
       {route === "student" ? <StudentJoin onNavigate={navigate} onJoinStudent={joinStudent} /> : null}
       {route === "play" ? (
         <StudentPlay
@@ -463,10 +480,10 @@ export default function App() {
           onViewReport={openStudentReport}
         />
       ) : null}
-      {!needsAuth && route === "report" ? (
+      {route === "report" ? (
         <ClassReport report={ensureLiveClassReport(liveClassReport, activeLesson, mockClass, mockSession)} />
       ) : null}
-      {!needsAuth && route === "backend" ? (
+      {route === "backend" ? (
         <BackendConsole
           user={authUser}
           usage={usageAccount}
@@ -477,14 +494,14 @@ export default function App() {
           onNavigate={navigate}
         />
       ) : null}
-      {!needsAuth && route === "ops" && authUser?.role === "admin" ? (
+      {route === "ops" && authUser?.role === "admin" ? (
         <OpsConsole
           database={opsDatabase}
           onUpdateDatabase={updateOpsDatabase}
           onApplyTenantEntitlements={applyTenantEntitlements}
         />
       ) : null}
-      {!needsAuth && route === "ops" && authUser?.role !== "admin" ? (
+      {route === "ops" && authUser?.role !== "admin" ? (
         <OpsLoginPage onLogin={login} onNavigate={navigate} />
       ) : null}
       {route === "help" ? <HelpCenter /> : null}

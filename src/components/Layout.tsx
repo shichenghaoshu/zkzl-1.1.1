@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { AuthUser, UsageAccount } from "../data/mockCommerce";
 import { getPlanLabel } from "../data/mockCommerce";
 import { mainNavItems, type AppRoute } from "../data/routes";
@@ -16,6 +16,8 @@ type LayoutProps = {
 };
 
 export function Layout({ activeRoute, onNavigate, user, usage, onLogout, children }: LayoutProps) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   return (
     <div className="app-background">
       <div className="cloud cloud-one" aria-hidden="true" />
@@ -23,7 +25,15 @@ export function Layout({ activeRoute, onNavigate, user, usage, onLogout, childre
       <div className="star-dust" aria-hidden="true" />
 
       <div className="relative z-10 mx-auto flex max-w-[1480px] gap-5 px-4 py-4 sm:px-6 lg:px-8">
-        <Sidebar activeRoute={activeRoute} onNavigate={onNavigate} user={user} usage={usage} onLogout={onLogout} />
+        <Sidebar
+          activeRoute={activeRoute}
+          onNavigate={onNavigate}
+          user={user}
+          usage={usage}
+          onLogout={onLogout}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+        />
         <main className="min-w-0 flex-1">
           <header className="mobile-header glass-panel sticky top-3 z-30 mb-5 rounded-3xl px-3 py-3 shadow-lg shadow-blue-200/30 lg:hidden">
             <div className="mb-3 flex items-center justify-between">
@@ -48,7 +58,7 @@ export function Layout({ activeRoute, onNavigate, user, usage, onLogout, childre
                   className="rounded-2xl bg-white/70 px-3 py-2 text-sm font-bold text-slate-600"
                   onClick={() => onNavigate("login")}
                 >
-                  邀请码登录
+                  登录
                 </button>
               )}
             </div>

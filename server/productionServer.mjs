@@ -10,7 +10,7 @@ const distDir = resolve(rootDir, "dist");
 const configPath = resolve(rootDir, ".keyou-ai-provider.local.json");
 const sessions = new Map();
 const sessionTtlMs = 1000 * 60 * 60 * 8;
-const sceneTypes = ["story", "drag-classify", "match", "quiz-race", "boss"];
+const sceneTypes = ["story", "drag-classify", "match", "quiz-race", "boss", "flashcard", "ordering", "memory"];
 
 const defaultDeepSeekProvider = {
   id: "api-deepseek",
@@ -480,11 +480,12 @@ function buildLessonMessages(input) {
         "- scenes: 必须 5 个关卡",
         "",
         "每个 scene 必须包含：",
-        "- type: 只能从 story, drag-classify, match, quiz-race, boss 中选择",
+        "- type: 只能从 story, drag-classify, match, quiz-race, boss, flashcard, ordering, memory 中选择",
         "- title: 适合老师识别的关卡名",
         "- description: 面向课堂的关卡说明",
         "- questions: 1-3 道题",
         "- rewards: { stars: number, coins: number }",
+        "- match/memory 的 options 使用“左项:右项”形式；ordering 的 answer 使用逗号分隔的正确顺序；flashcard 使用 prompt/answer 作为卡片正反面",
         "",
         "每个 question 必须包含：",
         "- prompt: 小学生能读懂的题干",

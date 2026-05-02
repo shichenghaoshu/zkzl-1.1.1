@@ -52,62 +52,62 @@ export const mainNavItems: Array<{
 }> = [
   {
     route: "login",
-    label: "登录验证",
+    label: "登录",
     icon: "🔐",
-    description: "邀请码注册"
+    description: "邀请码"
   },
   {
     route: "teacher-dashboard",
-    label: "我的课件",
+    label: "课件",
     icon: "📚",
-    description: "老师端首页"
+    description: "首页"
   },
   {
     route: "generate",
     label: "AI生成",
     icon: "✨",
-    description: "输入知识点"
+    description: "生成课件"
   },
   {
     route: "editor",
-    label: "课件编辑器",
+    label: "编辑",
     icon: "🛠️",
     description: "调整内容"
   },
   {
     route: "share",
-    label: "快速分享",
+    label: "分享",
     icon: "📨",
-    description: "链接二维码 PIN"
+    description: "链接二维码"
   },
   {
     route: "student",
-    label: "学生加入",
+    label: "学生",
     icon: "📱",
-    description: "无需下载 App"
+    description: "加入课堂"
   },
   {
     route: "play",
-    label: "互动闯关",
+    label: "闯关",
     icon: "🎮",
-    description: "游戏化学习"
+    description: "互动学习"
   },
   {
     route: "report",
-    label: "数据报告",
+    label: "报告",
     icon: "📊",
-    description: "班级实时反馈"
+    description: "班级数据"
   },
   {
     route: "backend",
-    label: "邀请码/核销",
+    label: "核销",
     icon: "⚙️",
-    description: "公开生成邀请码"
+    description: "邀请码管理"
   },
   {
     route: "ops",
-    label: "管理员",
+    label: "管理",
     icon: "🗄️",
-    description: "独立登录 Ops"
+    description: "Ops后台"
   }
 ];

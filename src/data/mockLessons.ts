@@ -6,9 +6,19 @@ export type Question = {
   explanation?: string;
 };
 
+export type SceneType =
+  | "story"
+  | "drag-classify"
+  | "match"
+  | "quiz-race"
+  | "boss"
+  | "flashcard"
+  | "ordering"
+  | "memory";
+
 export type Scene = {
   id: string;
-  type: "story" | "drag-classify" | "match" | "quiz-race" | "boss";
+  type: SceneType;
   title: string;
   description: string;
   questions: Question[];
@@ -65,9 +75,9 @@ export const mockLesson: Lesson = {
       questions: [
         {
           id: "q-match-1",
-          prompt: "哪一个图形表示四分之三？",
-          options: ["涂满 1/2", "涂满 3/4", "涂满 1/4"],
-          answer: "涂满 3/4"
+          prompt: "把分数和读法配成好朋友。",
+          options: ["1/2:二分之一", "3/4:四分之三", "1/4:四分之一", "2/3:三分之二"],
+          answer: "全部配对正确"
         }
       ],
       rewards: { stars: 3, coins: 20 }
@@ -102,6 +112,44 @@ export const mockLesson: Lesson = {
         }
       ],
       rewards: { stars: 4, coins: 40 }
+    },
+    {
+      id: "scene-flashcard",
+      type: "flashcard",
+      title: "知识翻卡",
+      description: "翻一翻，复习分数的基本概念。",
+      questions: [],
+      rewards: { stars: 2, coins: 10 }
+    },
+    {
+      id: "scene-ordering",
+      type: "ordering",
+      title: "排序挑战",
+      description: "把分数从小到大排一排。",
+      questions: [
+        {
+          id: "q-order-1",
+          prompt: "把下面的分数从小到大排列",
+          options: ["1/4", "1/2", "3/4", "1"],
+          answer: "1/4,1/2,3/4,1"
+        }
+      ],
+      rewards: { stars: 3, coins: 20 }
+    },
+    {
+      id: "scene-memory",
+      type: "memory",
+      title: "记忆翻牌",
+      description: "翻开两张卡片，找到分数和百分数的配对。",
+      questions: [
+        {
+          id: "q-memory-1",
+          prompt: "找到分数和百分数的配对。",
+          options: ["1/2:50%", "3/4:75%", "1/4:25%", "1:100%"],
+          answer: "全部配对正确"
+        }
+      ],
+      rewards: { stars: 3, coins: 20 }
     }
   ]
 };

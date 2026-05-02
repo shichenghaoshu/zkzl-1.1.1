@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { DragClassifyGame } from "../components/DragClassifyGame";
+import { FlashcardGame } from "../components/FlashcardGame";
 import { GameMap } from "../components/GameMap";
+import { MatchGame } from "../components/MatchGame";
+import { MemoryGame } from "../components/MemoryGame";
+import { OrderingGame } from "../components/OrderingGame";
 import { ProgressBar } from "../components/ProgressBar";
 import { QuizRaceGame } from "../components/QuizRaceGame";
 import { getAnswerOnlyItems } from "../data/liveClassReport";
@@ -125,25 +129,7 @@ export function StudentPlay({ lesson, student, onNavigate, onRecordAnswer, onVie
       ) : (
         <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
           <div>
-            {activeLevel === 0 || activeLevel === 1 ? (
-              <DragClassifyGame
-                key={activeLevel}
-                mode="student"
-                config={buildDragConfig(activeScene, activeQuestion)}
-                onComplete={reward}
-                onNext={nextLevel}
-              />
-            ) : (
-              <QuizRaceGame
-                key={activeLevel}
-                config={buildQuizConfig(activeQuestion)}
-                onAnswer={(_, correct) => {
-                  if (!correct) onRecordAnswer(activeLevel, false, 0);
-                }}
-                onSuccess={reward}
-                onNext={nextLevel}
-              />
-            )}
+            {renderSceneGame(activeScene, activeQuestion, activeLevel, reward, nextLevel, onRecordAnswer)}
           </div>
           <div className="space-y-5">
             <Card tone="sun">
@@ -220,4 +206,136 @@ function buildQuizConfig(question: Question | undefined) {
     answer,
     explanation: question?.explanation
   };
+}
+
+function buildOrderingConfig(scene: Scene, question: Question | undefined) {
+  const items = question?.options.length ? question.options : ["1/4", "1/2", "3/4", "1"];
+  const correctOrder = question?.answer ? question.answer.split(",").map((s) => s.trim()) : [...items].sort();
+  return {
+    prompt: question?.prompt || scene.description || "把选项按正确顺序排列。",
+    items,
+    correctOrder
+  };
+}
+
+function buildPairConfig(scene: Scene, question: Question | undefined) {
+  const opts = question?.options.length ? question.options : ["1/2", "3/4", "1/4", "2/3"];
+  const pairs = opts.map((opt) => {
+    const parts = opt.split(":");
+    return { left: parts[0]?.trim() || opt, right: parts[1]?.trim() || opt };
+  });
+  return {
+    prompt: question?.prompt || scene.description || "把对应的选项配对。",
+    pairs
+  };
+}
+
+function renderSceneGame(
+  scene: Scene | null,
+  question: Question | undefined,
+  activeLevel: number,
+  reward: () => void,
+  nextLevel: () => void,
+  onRecordAnswer: (levelIndex: number, correct: boolean, stars: number) => void
+) {
+  if (!scene) return null;
+
+  switch (scene.type) {
+    case "story":
+      return (
+        <Card className="p-6 text-center">
+          <div className="text-6xl mb-4">📖</div>
+          <h3 className="text-3xl font-black text-ink">{scene.title}</h3>
+          <p className="mt-3 text-lg font-bold text-slate-600">{scene.description}</p>
+          <Button className="mt-6" variant="mint" size="lg" onClick={reward}>
+            继续冒险
+          </Button>
+        </Card>
+      );
+    case "drag-classify":
+      return (
+        <DragClassifyGame
+          key={activeLevel}
+          mode="student"
+          config={buildDragConfig(scene, question)}
+          onComplete={reward}
+          onNext={nextLevel}
+        />
+      );
+    case "match":
+      return (
+        <MatchGame
+          key={activeLevel}
+          config={buildPairConfig(scene, question)}
+          onComplete={reward}
+          onNext={nextLevel}
+        />
+      );
+    case "quiz-race":
+      return (
+        <QuizRaceGame
+          key={activeLevel}
+          config={buildQuizConfig(question)}
+          onAnswer={(_, correct) => {
+            if (!correct) onRecordAnswer(activeLevel, false, 0);
+          }}
+          onSuccess={reward}
+          onNext={nextLevel}
+        />
+      );
+    case "boss":
+      return (
+        <QuizRaceGame
+          key={activeLevel}
+          config={buildQuizConfig(question)}
+          onAnswer={(_, correct) => {
+            if (!correct) onRecordAnswer(activeLevel, false, 0);
+          }}
+          onSuccess={reward}
+          onNext={nextLevel}
+        />
+      );
+    case "flashcard":
+      return (
+        <FlashcardGame
+          key={activeLevel}
+          config={{
+            prompt: scene.description,
+            cards: scene.questions.length
+              ? scene.questions.map((q) => ({ front: q.prompt, back: q.answer + (q.explanation ? `。${q.explanation}` : "") }))
+              : [{ front: scene.title, back: scene.description }]
+          }}
+          onComplete={reward}
+          onNext={nextLevel}
+        />
+      );
+    case "ordering":
+      return (
+        <OrderingGame
+          key={activeLevel}
+          config={buildOrderingConfig(scene, question)}
+          onComplete={reward}
+          onNext={nextLevel}
+        />
+      );
+    case "memory":
+      return (
+        <MemoryGame
+          key={activeLevel}
+          config={buildPairConfig(scene, question)}
+          onComplete={reward}
+          onNext={nextLevel}
+        />
+      );
+    default:
+      return (
+        <DragClassifyGame
+          key={activeLevel}
+          mode="student"
+          config={buildDragConfig(scene, question)}
+          onComplete={reward}
+          onNext={nextLevel}
+        />
+      );
+  }
 }
